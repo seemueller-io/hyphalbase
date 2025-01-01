@@ -4,12 +4,14 @@
 
 ## Overview
 
-**HyphalBase** is a Cloudflare Worker-based vector database that leverages Durable Objects for storing and retrieving vector embeddings. It supports essential CRUD operations (`put`, `get`, `delete`, `deleteAll`) along with a built-in cosine similarity `search` for finding the most relevant vectors. This project is designed to provide a minimal, self-hosted vector storage solution on Cloudflare’s edge network. 
+**HyphalBase** is a Cloudflare Worker-based vector database that leverages Durable Objects for storing and retrieving vector embeddings. It supports essential CRUD operations (`put`, `get`, `delete`, `deleteAll`) along with a built-in cosine similarity `search` for finding the most relevant vectors. This project is designed to provide a minimal, self-hosted vector storage solution on Cloudflare’s edge network.
 
-This is the third iteration of a vector database I have developed, drawing on insights from earlier implementations to refine and optimize this version. The concept is exceptionally powerful and versatile for enabling in-context learning ([ICL](https://github.com/EgoAlpha/prompt-in-context-learning)) when applied to a normalized higher-dimensional abstraction of **any** dataset. 
+This is the third iteration of a vector database I have developed, drawing on insights from earlier implementations to refine and optimize this version. The concept is exceptionally powerful and versatile for enabling in-context learning ([ICL](https://github.com/EgoAlpha/prompt-in-context-learning)) when applied to a normalized higher-dimensional abstraction of **any** dataset.
 
 I’m eager to collaborate and would greatly appreciate your input and assistance!
 
+
+![hyphalbase.png](https://github.com/seemueller-io/hyphalbase/blob/main/hyphalbase.png?raw=true)
 
 ## Quickstart
 ```bash
