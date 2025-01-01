@@ -29,18 +29,18 @@ export class HyphalObject extends DurableObject {
 			case "put": {
 				let { id, namespace, vector, content } = payload;
 
-				// Generate a UUID if id is not provided
+
 				if (!id) {
 					id = uuidv4();
 				}
 
-				// Encode the vector into a BLOB
+
 				const blob = Buffer.from(this.encodeVectorToBlob(vector));
 
-				// Insert or replace the vector in the database
+
 				this.sql.exec(
 					`INSERT OR REPLACE INTO vectors (id, namespace, vectors, content) VALUES (?, ?, ?, ?)`,
-					id, namespace, blob, content // Pass parameters as an array
+					id, namespace, blob, content
 				);
 
 				return new Response(
@@ -54,33 +54,32 @@ export class HyphalObject extends DurableObject {
 			case "get": {
 				const { id } = payload;
 
-				// Retrieve the vector from the database
 				const cursor = this.sql.exec(
 					`SELECT id, namespace, vectors, content FROM vectors WHERE id = ?`,
-					[id] // Pass parameters as an array
+					[id]
 				);
 
-				// Convert the Cursor into a usable object
+				
 				const results = [];
 				for (const row of cursor) {
 					results.push(row);
 				}
 
-				// Ensure results are valid
+				
 				if (results.length === 0) {
 					return new Response("Vector not found", { status: 404 });
 				}
 
-				// Extract the first row
+				
 				const row = results[0];
 				if (!row || !row.vectors) {
 					return new Response("Vector data is corrupted or missing", { status: 500 });
 				}
 
-				// Debug: Log the vectors column
+				
 				console.log("Vectors column:", row.vectors);
 
-				// Decode the vector
+				
 				let vector;
 				try {
 					vector = this.decodeBlobToVector(row.vectors);
@@ -105,7 +104,7 @@ export class HyphalObject extends DurableObject {
 			case "delete": {
 				const { id } = payload;
 
-				// Delete the vector from the database
+
 				this.sql.exec(`DELETE FROM vectors WHERE id = ?`, [id]);
 
 				return new Response("Vector deleted successfully", {
@@ -116,12 +115,12 @@ export class HyphalObject extends DurableObject {
 			case "search": {
 				const { vector, topN } = payload;
 
-				// Retrieve all vectors from the database
+
 				const results = this.sql.exec(
 					`SELECT id, namespace, vectors, content FROM vectors`
 				);
 
-				// Compute cosine similarity with each vector
+
 				const similarities = results.map((row) => {
 					const storedVector = this.decodeBlobToVector(row.vectors);
 					const similarity = this.cosineSimilarity(vector, storedVector);
@@ -133,10 +132,10 @@ export class HyphalObject extends DurableObject {
 					};
 				});
 
-				// Sort by similarity in descending order
+
 				similarities.sort((a, b) => b.similarity - a.similarity);
 
-				// Return top N results if specified
+
 				const topResults = topN ? similarities.slice(0, topN) : similarities;
 
 				return new Response(JSON.stringify(topResults), {
@@ -146,7 +145,7 @@ export class HyphalObject extends DurableObject {
 			}
 
 			case "deleteAll": {
-				// Delete all vectors from the database
+
 				this.sql.exec(`DELETE FROM vectors`);
 
 				return new Response("All vectors deleted successfully", {
@@ -169,7 +168,7 @@ export class HyphalObject extends DurableObject {
 	}
 
 	decodeBlobToVector(blob: ArrayBuffer | Uint8Array): number[] {
-		// If the input is an ArrayBuffer, convert it to a Uint8Array
+
 		if (blob instanceof ArrayBuffer) {
 			blob = new Uint8Array(blob);
 		}
@@ -178,7 +177,7 @@ export class HyphalObject extends DurableObject {
 			throw new TypeError("Invalid blob data for decoding.");
 		}
 
-		// Handle the decoding process
+
 		const buffer = blob.buffer.slice(blob.byteOffset, blob.byteOffset + blob.byteLength);
 		const view = new Float32Array(buffer);
 		return Array.from(view);
