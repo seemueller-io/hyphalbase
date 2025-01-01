@@ -10,7 +10,7 @@
 			"@cloudflare/workers-types/experimental",
 			"@cloudflare/vitest-pool-workers"
 		],
-		"include": ["./**/*.ts", "../src/env.d.ts"],
+		"include": ["worker-configuration.d.ts", "src", "test"],
 		"resolveJsonModule": true,
 		"allowJs": true,
 		"noEmit": true,

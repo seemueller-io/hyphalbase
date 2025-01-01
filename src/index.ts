@@ -12,13 +12,7 @@ export default {
 	 * @returns The response to be sent back to the client
 	 */
 	async fetch(request, env, ctx): Promise<Response> {
-		const { pathname } = new URL(request.url);
 
-		if (pathname === "/404") {
-			return new Response("Not found", { status: 404 });
-		}
-		// We will create a `DurableObjectId` using the pathname from the Worker request
-		// This id refers to a unique instance of our 'MyDurableObject' class above
 		let id: DurableObjectId = env.HYPHAL_OBJECT.idFromName(new URL(request.url).pathname);
 
 		// This stub creates a communication channel with the Durable Object instance
@@ -27,8 +21,6 @@ export default {
 
 		// We call the `sayHello()` RPC method on the stub to invoke the method on the remote
 		// Durable Object instance
-		let greeting = await stub.sayHello("World");
-
-		return new Response(greeting);
+		return stub.fetch(request);
 	},
 } satisfies ExportedHandler<Env>;
