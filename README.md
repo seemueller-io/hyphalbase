@@ -51,7 +51,7 @@ $ wrangler dev
 
 2. **Install dependencies**
    ```bash
-   npm install
+   pnpm install
    ```
    or
    ```bash
@@ -61,7 +61,7 @@ $ wrangler dev
 3. **Configure Wrangler**
    Make sure you have [Wrangler](https://developers.cloudflare.com/workers/wrangler/get-started/) installed and that you’ve logged in to your Cloudflare account:
    ```bash
-   npm install -g wrangler
+   pnpm install -g wrangler
    wrangler login
    ```
 
@@ -72,7 +72,7 @@ $ wrangler dev
 Run a local version of your Worker with Durable Objects by using Wrangler’s dev mode:
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 This will spin up a local server on [`localhost:8787`](http://localhost:8787). Any request path will be routed to the `HyphalObject` Durable Object instance, which handles your `put`, `get`, `delete`, `deleteAll`, and `search` operations.
@@ -82,7 +82,7 @@ This will spin up a local server on [`localhost:8787`](http://localhost:8787). A
 Deploy your Worker to Cloudflare:
 
 ```bash
-npm run deploy
+pnpm run deploy
 ```
 
 Wrangler will package and upload your code, creating or updating the Durable Object if needed. Once deployed, your Worker will be live at the assigned domain/subdomain configured in your `wrangler.toml`.
@@ -143,10 +143,10 @@ bun run build       # Build the project
 bun run seed        # Seed example data
 
 # NPM equivalents
-npm run dev
-npm run test
-npm run build
-npm run seed
+pnpm run dev
+pnpm run test
+pnpm run build
+pnpm run seed
 ```
 
 ## Project Structure
