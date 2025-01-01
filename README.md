@@ -1,11 +1,44 @@
 # HyphalBase
 
+> **⚠️ WARNING:** This is an early alpha release. The service may be immediately useful, but it will likely require modifications for production use.
+
 ## Overview
 
-**HyphalBase** is a Cloudflare Worker-based vector database that uses Durable Objects for storing and retrieving vector embeddings. It supports basic CRUD operations (`put`, `get`, `delete`, `deleteAll`) along with a built-in cosine similarity `search` to find the most relevant vectors. This project aims to provide a minimal, self-hosted vector storage solution on Cloudflare’s edge network.
+**HyphalBase** is a Cloudflare Worker-based vector database that leverages Durable Objects for storing and retrieving vector embeddings. It supports essential CRUD operations (`put`, `get`, `delete`, `deleteAll`) along with a built-in cosine similarity `search` for finding the most relevant vectors. This project is designed to provide a minimal, self-hosted vector storage solution on Cloudflare’s edge network. 
 
+This is the third iteration of a vector database I have developed, drawing on insights from earlier implementations to refine and optimize this version. The concept is exceptionally powerful and versatile for enabling in-context learning ([ICL](https://github.com/EgoAlpha/prompt-in-context-learning)) when applied to a normalized higher-dimensional abstraction of **any** dataset. 
+
+I’m eager to collaborate and would greatly appreciate your input and assistance!
+
+
+## Quickstart
 ```bash
-$ wrangler dev
+# Install dependencies and start the hyphalbase server.
+$ <pnpm|npm|yarn> install && wrangler dev
+
+
+# (Optional) Define a reference id to make testing easier.
+export EXAMPLE_RECORD_ID=123e4567-e89b-12d3-a456-426614174000
+
+
+# Save a vector record with EXAMPLE_RECORD_ID (api will generate an a UUIDv4 if not supplied).
+$ curl -X POST http://localhost:8787 -H "Content-Type: application/json" -d '{"operation":"put","payload":{"id":"${EXAMPLE_RECORD_ID}","namespace":"exampleNamespace","vector":[0.1,0.2,0.3],"content":"Sample content"}}'
+
+
+# Get the vector record.
+$ curl -X POST http://localhost:8787 -H "Content-Type: application/json" -d '{"operation":"get","payload":{"id":"${EXAMPLE_RECORD_ID}"}}'
+
+
+# Search the records (todo: server-side filters [namespace, ect...]).
+curl -X POST http://localhost:8787 -H "Content-Type: application/json" -d '{"operation":"search","payload":{"vector":[0.1,0.2,0.3],"topN":5}}'
+
+
+# Delete the vector record.
+$ curl -X POST http://localhost:8787 -H "Content-Type: application/json" -d '{"operation":"delete","payload":{"id":"${EXAMPLE_RECORD_ID}"}}'
+
+
+# Delete all the records.
+curl -X POST http://localhost:8787 -H "Content-Type: application/json" -d '{"operation":"deleteAll"}'
 ```
 
 ## Philosophy
