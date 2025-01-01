@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { v4 as uuidv4 } from 'uuid'; // Import a UUID library
+import { v4 as uuidv4 } from 'uuid';
 
 export class HyphalObject extends DurableObject {
 	private sql: SqlStorage;
@@ -8,7 +8,7 @@ export class HyphalObject extends DurableObject {
 		super(ctx, env);
 		this.sql = ctx.storage.sql;
 
-		// Initialize the vectors table with UUID as the primary key
+		
 		this.sql.exec(`
       CREATE TABLE IF NOT EXISTS vectors(
         id TEXT PRIMARY KEY,       -- Use UUID as TEXT
