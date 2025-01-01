@@ -18,7 +18,7 @@ $ <pnpm|npm|yarn> install && wrangler dev
 
 
 # (Optional) Define a reference id to make testing easier.
-export EXAMPLE_RECORD_ID=123e4567-e89b-12d3-a456-426614174000
+$ export EXAMPLE_RECORD_ID=123e4567-e89b-12d3-a456-426614174000
 
 
 # Save a vector record with EXAMPLE_RECORD_ID (api will generate an a UUIDv4 if not supplied).
@@ -30,7 +30,7 @@ $ curl -X POST http://localhost:8787 -H "Content-Type: application/json" -d '{"o
 
 
 # Search the records (todo: server-side filters [namespace, ect...]).
-curl -X POST http://localhost:8787 -H "Content-Type: application/json" -d '{"operation":"search","payload":{"vector":[0.1,0.2,0.3],"topN":5}}'
+$ curl -X POST http://localhost:8787 -H "Content-Type: application/json" -d '{"operation":"search","payload":{"vector":[0.1,0.2,0.3],"topN":5}}'
 
 
 # Delete the vector record.
@@ -38,7 +38,7 @@ $ curl -X POST http://localhost:8787 -H "Content-Type: application/json" -d '{"o
 
 
 # Delete all the records.
-curl -X POST http://localhost:8787 -H "Content-Type: application/json" -d '{"operation":"deleteAll"}'
+$ curl -X POST http://localhost:8787 -H "Content-Type: application/json" -d '{"operation":"deleteAll"}'
 ```
 
 ## Philosophy
