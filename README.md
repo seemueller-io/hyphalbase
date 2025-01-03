@@ -1,6 +1,6 @@
 # HyphalBase
 
-> **⚠️ WARNING:** This is an early alpha release. The service may be immediately useful, but it will likely require modifications for production use.
+> **⚠️ WARNING:** This is pre-alpha incomplete code meant to serve as a basis for people building their own vector databases on the edge.
 
 ## Overview
 
