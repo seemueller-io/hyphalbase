@@ -96,7 +96,6 @@ $ curl -X POST http://localhost:8787 -H "Content-Type: application/json" -d '{"o
 3. **Configure Wrangler**
    Make sure you have [Wrangler](https://developers.cloudflare.com/workers/wrangler/get-started/) installed and that you’ve logged in to your Cloudflare account:
    ```bash
-   pnpm install -g wrangler
    wrangler login
    ```
 
