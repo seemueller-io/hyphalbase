@@ -1,14 +1,17 @@
 import { DurableObject } from "cloudflare:workers";
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4 } from "uuid";
 
 export class HyphalObject extends DurableObject {
 	private sql: SqlStorage;
+	ctx: DurableObjectState;
+	env: Env;
 
-	constructor(private ctx: DurableObjectState, private env: Env) {
+	constructor(ctx: DurableObjectState, env: Env) {
 		super(ctx, env);
 		this.sql = ctx.storage.sql;
+		this.ctx = ctx;
+		this.env = env;
 
-		
 		this.sql.exec(`
       CREATE TABLE IF NOT EXISTS vectors(
         id TEXT PRIMARY KEY,       -- Use UUID as TEXT
@@ -20,7 +23,7 @@ export class HyphalObject extends DurableObject {
 	}
 
 	async fetch(request: Request): Promise<Response> {
-		const { operation, payload } = await request.json();
+		const { operation, payload } = await request.json<Record<string, any>>();
 		return this.execute(operation, payload);
 	}
 
@@ -29,60 +32,51 @@ export class HyphalObject extends DurableObject {
 			case "put": {
 				let { id, namespace, vector, content } = payload;
 
-
 				if (!id) {
 					id = uuidv4();
 				}
 
-
 				const blob = Buffer.from(this.encodeVectorToBlob(vector));
 
+				this.sql.exec(`INSERT OR REPLACE INTO vectors (id, namespace, vectors, content) VALUES (?, ?, ?, ?)`, id, namespace, blob, content);
 
-				this.sql.exec(
-					`INSERT OR REPLACE INTO vectors (id, namespace, vectors, content) VALUES (?, ?, ?, ?)`,
-					id, namespace, blob, content
-				);
-
-				return new Response(
-					JSON.stringify({ id }),
-					{
-						status: 200,
-						headers: { "Content-Type": "application/json" },
-					}
-				);
+				return new Response(JSON.stringify({ id }), {
+					status: 200,
+					headers: { "Content-Type": "application/json" }
+				});
 			}
 			case "get": {
 				const { id } = payload;
 
-				const cursor = this.sql.exec(
-					`SELECT id, namespace, vectors, content FROM vectors WHERE id = ?`,
-					[id]
-				);
+				const cursor = this.sql.exec(`SELECT id, namespace, vectors, content FROM vectors WHERE id = ?`, [id]);
 
-				
 				const results = [];
 				for (const row of cursor) {
 					results.push(row);
 				}
 
-				
 				if (results.length === 0) {
 					return new Response("Vector not found", { status: 404 });
 				}
 
-				
 				const row = results[0];
 				if (!row || !row.vectors) {
 					return new Response("Vector data is corrupted or missing", { status: 500 });
 				}
 
-				
 				console.log("Vectors column:", row.vectors);
 
-				
 				let vector;
 				try {
-					vector = this.decodeBlobToVector(row.vectors);
+					if (typeof row.vectors === "string") {
+						vector = this.decodeBlobToVector(row.vectors);
+					}
+					if (row.vectors instanceof ArrayBuffer) {
+						vector = this.decodeBlobToVector(row.vectors);
+					}
+					// if ( typeof row.vectors === "number") {
+					//  	vector = this.decodeBlobToVector(row.vectors);
+					// }
 				} catch (error) {
 					return new Response(`Error decoding vector: ${error.message}`, { status: 500 });
 				}
@@ -92,11 +86,11 @@ export class HyphalObject extends DurableObject {
 						id: row.id,
 						namespace: row.namespace,
 						vector: vector,
-						content: row.content,
+						content: row.content
 					}),
 					{
 						status: 200,
-						headers: { "Content-Type": "application/json" },
+						headers: { "Content-Type": "application/json" }
 					}
 				);
 			}
@@ -104,52 +98,63 @@ export class HyphalObject extends DurableObject {
 			case "delete": {
 				const { id } = payload;
 
-
 				this.sql.exec(`DELETE FROM vectors WHERE id = ?`, [id]);
 
 				return new Response("Vector deleted successfully", {
-					status: 200,
+					status: 200
 				});
 			}
 
 			case "search": {
 				const { vector, topN } = payload;
 
+				const results = this.sql.exec(`SELECT id, namespace, vectors, content FROM vectors`);
 
-				const results = this.sql.exec(
-					`SELECT id, namespace, vectors, content FROM vectors`
-				);
+				console.log({ results });
 
+				const data = results.toArray();
 
-				const similarities = results.map((row) => {
-					const storedVector = this.decodeBlobToVector(row.vectors);
-					const similarity = this.cosineSimilarity(vector, storedVector);
+				const similarities = data.map((row) => {
+					let vector;
+					try {
+						if (typeof row.vectors === "string") {
+							vector = this.decodeBlobToVector(row.vectors);
+						}
+						if (row.vectors instanceof ArrayBuffer) {
+							vector = this.decodeBlobToVector(row.vectors);
+						}
+					} catch (error) {
+						console.log(error);
+					}
+					// if ( typeof row.vectors === "number") {
+					//  	vector = this.decodeBlobToVector(row.vectors);
+					// }
+					const storedVector = vector ?? [];
+					const similarity = this.cosineSimilarity(vector as any[], storedVector);
+
 					return {
 						id: row.id,
 						namespace: row.namespace,
 						content: row.content,
-						similarity: similarity,
+						similarity: similarity
 					};
 				});
 
-
 				similarities.sort((a, b) => b.similarity - a.similarity);
-
 
 				const topResults = topN ? similarities.slice(0, topN) : similarities;
 
 				return new Response(JSON.stringify(topResults), {
 					status: 200,
-					headers: { "Content-Type": "application/json" },
+					headers: { "Content-Type": "application/json" }
 				});
 			}
 
 			case "deleteAll": {
-
 				this.sql.exec(`DELETE FROM vectors`);
 
 				return new Response("All vectors deleted successfully", {
-					status: 200,
+					status: 200
 				});
 			}
 
@@ -167,9 +172,16 @@ export class HyphalObject extends DurableObject {
 		return new Uint8Array(buffer);
 	}
 
-	decodeBlobToVector(blob: ArrayBuffer | Uint8Array): number[] {
-
-		if (blob instanceof ArrayBuffer) {
+	decodeBlobToVector(blob: ArrayBuffer | Uint8Array | string): number[] {
+		if (typeof blob === "string") {
+			const binaryString = atob(blob);
+			const len = binaryString.length;
+			const bytes = new Uint8Array(len);
+			for (let i = 0; i < len; i++) {
+				bytes[i] = binaryString.charCodeAt(i);
+			}
+			blob = bytes;
+		} else if (blob instanceof ArrayBuffer) {
 			blob = new Uint8Array(blob);
 		}
 
@@ -177,12 +189,10 @@ export class HyphalObject extends DurableObject {
 			throw new TypeError("Invalid blob data for decoding.");
 		}
 
-
 		const buffer = blob.buffer.slice(blob.byteOffset, blob.byteOffset + blob.byteLength);
 		const view = new Float32Array(buffer);
 		return Array.from(view);
 	}
-
 
 	cosineSimilarity(vecA: number[], vecB: number[]): number {
 		let dotProduct = 0;

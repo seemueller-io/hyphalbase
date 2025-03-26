@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import OpenAI from "openai";
 
 const fireworksOpenAIClient = new OpenAI({
 	apiKey: process.env.FIREWORKS_API_KEY,
