@@ -1,25 +1,17 @@
 {
 	"name": "hyphalbase",
-	"version": "0.0.0",
+	"version": "1.0.0",
 	"private": true,
 	"type": "module",
+	"workspaces": [
+		"packages/**"
+	],
 	"scripts": {
-		"deploy": "wrangler deploy",
-		"dev": "wrangler dev",
-		"start": "wrangler dev",
-		"cf-typegen": "wrangler types",
-		"test": "vitest",
-		"seed": "bun --env-file .env ./scripts/seed.ts"
+		"clean": "scripts/cleanup.sh",
+		"test": "(cd packages/hyphalbase; bun run test)"
 	},
-	"devDependencies": {
-		"@cloudflare/vitest-pool-workers": "^0.5.32",
-		"@cloudflare/workers-types": "^4.20241127.0",
-		"typescript": "^5.5.2",
-		"vitest": "2.0.5",
-		"wrangler": "^3.91.0"
-	},
+	"packageManager": "pnpm@10.10.0+sha512.d615db246fe70f25dcfea6d8d73dee782ce23e2245e3c4f6f888249fb568149318637dca73c2c5c8ef2a4ca0d5657fb9567188bfab47f566d1ee6ce987815c39",
 	"dependencies": {
-		"openai": "^4.73.1",
-		"uuid": "^11.0.3"
+		"@types/node": "20.19.0"
 	}
 }
