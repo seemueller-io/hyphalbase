@@ -1,0 +1,23 @@
+todo
+prompt.md
+
+# Ignore lock files and workspace config
+pnpm-lock.yaml
+pnpm-workspace.yaml
+
+# Ignore all declaration files (these are very large)
+**/*.d.ts
+
+# Ignore all test scripts
+scripts/test_*.js
+
+# Ignore Wrangler and TOML/JSONC configs
+**/wrangler.toml
+**/wrangler.jsonc
+
+# Optionally ignore README or guidelines if not used in prompt
+.junie/guidelines.md
+
+# Optional: ignore large object files if not needed
+packages/hyphalbase/src/hyphal_object.ts
+packages/hyphalbase-legacy/src/hyphal_object.ts
