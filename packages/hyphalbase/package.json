@@ -25,6 +25,7 @@
 		"typescript": "latest",
 		"vite": "latest",
 		"vitest": "latest",
-		"wrangler": "latest"
+		"wrangler": "latest",
+		"openai": "latest"
 	}
 }
