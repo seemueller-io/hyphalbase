@@ -174,3 +174,4 @@ dist
 **/.env
 prompt.md
 todo
+**/schema.graphql

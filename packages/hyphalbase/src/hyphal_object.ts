@@ -91,7 +91,13 @@ function createTable(sql: SqlStorage) {
 		`);
 }
 
-type InsertVectorArgs = { sql: SqlStorage; id: string; namespace: string; blob: Buffer; content: string };
+type InsertVectorArgs = {
+	sql: SqlStorage;
+	id: string;
+	namespace: string;
+	blob: Buffer;
+	content: string;
+};
 function insertVector(args: InsertVectorArgs) {
 	const { sql, id, namespace, blob, content } = args;
 	return sql.exec(
@@ -100,7 +106,7 @@ function insertVector(args: InsertVectorArgs) {
 		id,
 		namespace,
 		blob,
-		content,
+		content
 	);
 }
 type GetVectorArgs = { sql: SqlStorage; id: string };
@@ -110,7 +116,7 @@ function getVector(args: GetVectorArgs) {
 		`SELECT id, namespace, vectors, content
 		 FROM vectors
 		 WHERE id = ?`,
-		[id],
+		[id]
 	);
 }
 
@@ -121,14 +127,14 @@ function deleteVector(args: DeleteVectorArgs) {
 		`DELETE
 									 FROM vectors
 									 WHERE id = ?`,
-		[id],
+		[id]
 	);
 }
 
 function getAllVectors(sql: SqlStorage) {
 	return sql.exec(
 		`SELECT id, namespace, vectors, content
-		 FROM vectors`,
+		 FROM vectors`
 	);
 }
 
@@ -139,19 +145,21 @@ function deleteAllVectors(sql: SqlStorage) {
 
 export class HyphalObject {
 	constructor(private sql: SqlStorage) {
-		createTable(sql);
+		if(sql) {
+			createTable(sql);
+		}
 	}
 
 	private async query<Op extends keyof OperationMap>(
 		operation: Op,
-		payload: OperationMap[Op]['payload'],
+		payload: OperationMap[Op]['payload']
 	): Promise<OperationMap[Op]['response']> {
 		return this.execute(operation, payload);
 	}
 
 	async execute<Op extends keyof OperationMap>(
 		operation: Op,
-		payload: OperationMap[keyof OperationMap]['payload'],
+		payload: OperationMap[keyof OperationMap]['payload']
 	): Promise<OperationMap[Op]['response']> {
 		switch (operation) {
 			case 'put': {
@@ -242,7 +250,9 @@ export class HyphalObject {
 
 				const scoredRows = await this.scoreRows(rows, query);
 
-				const topResults = topN ? scoredRows.slice(0, topN) : scoredRows;
+				const topResults = topN
+					? scoredRows.slice(0, topN)
+					: scoredRows;
 
 				return topResults;
 			}
@@ -258,10 +268,13 @@ export class HyphalObject {
 		}
 	}
 
-	private async scoreRows(rows: SqlStorageCursor<Record<string, SqlStorageValue>>, embeddedQuery: number[]): Promise<SearchResponse> {
-		// @ts-ignore - map is valid
+	private async scoreRows(
+		rows: SqlStorageCursor<Record<string, SqlStorageValue>>,
+		embeddedQuery: number[]
+	): Promise<SearchResponse> {
 		return rows
-			.map((row) => ({
+		// @ts-ignore - map is valid
+			.map(row => ({
 				row,
 				vectors: HyphalObject.decodeRowToVector(row),
 			}))
@@ -270,7 +283,10 @@ export class HyphalObject {
 					id: row.id,
 					namespace: row.namespace,
 					content: row.content,
-					score: HyphalObject.cosineSimilarity(embeddedQuery, vectors),
+					score: HyphalObject.cosineSimilarity(
+						embeddedQuery,
+						vectors
+					),
 				};
 			})
 			.sort(this.sort);
@@ -281,7 +297,9 @@ export class HyphalObject {
 	}
 
 	encodeVectorToBlob(vector: number[]): Uint8Array {
-		const buffer = new ArrayBuffer(vector.length * Float32Array.BYTES_PER_ELEMENT);
+		const buffer = new ArrayBuffer(
+			vector.length * Float32Array.BYTES_PER_ELEMENT
+		);
 		const view = new Float32Array(buffer);
 		for (let i = 0; i < vector.length; i++) {
 			view[i] = vector[i];
@@ -298,7 +316,10 @@ export class HyphalObject {
 			throw new TypeError('Invalid blob data for decoding.');
 		}
 
-		const buffer = blob.buffer.slice(blob.byteOffset, blob.byteOffset + blob.byteLength);
+		const buffer = blob.buffer.slice(
+			blob.byteOffset,
+			blob.byteOffset + blob.byteLength
+		);
 		const view = new Float32Array(buffer);
 		return Array.from(view);
 	}
