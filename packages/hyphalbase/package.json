@@ -6,7 +6,7 @@
 		"dev": "wrangler dev",
 		"typegen": "wrangler types",
 		"test": "vitest run",
-		"postinstall": "wrangler types --include-runtime",
+		"postinstall": "wrangler types --include-runtime && pnpm dlx bun build.graphql-schema.ts && pnpm --filter \"*\" run generate",
 		"build": "wrangler build"
 	},
 	"dependencies": {

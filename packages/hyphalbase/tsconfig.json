@@ -8,7 +8,11 @@
 		"noEmit": true,
 		"skipLibCheck": true,
 		"allowSyntheticDefaultImports": true,
-		"types": ["worker-configuration.d.ts", "node", "@cloudflare/workers-types"]
+		"types": [
+			"worker-configuration.d.ts",
+			"node",
+			"@cloudflare/workers-types"
+		]
 	},
 	"include": ["src/*.*ts"]
 }

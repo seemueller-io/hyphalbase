@@ -7,19 +7,25 @@ describe('HyphalObject', () => {
 	it('should create a hyphal object', async () => {
 		const id = env.SQL.idFromName('/gql');
 		const stub = env.SQL.get(id);
-		const hyphalObject = await runInDurableObject(stub, (instance: SQLiteDurableObject) => {
-			expect(instance).toBeInstanceOf(SQLiteDurableObject); // Exact same class as import
-			return new HyphalObject(instance.ctx.storage.sql);
-		});
+		const hyphalObject = await runInDurableObject(
+			stub,
+			(instance: SQLiteDurableObject) => {
+				expect(instance).toBeInstanceOf(SQLiteDurableObject); // Exact same class as import
+				return new HyphalObject(instance.ctx.storage.sql);
+			}
+		);
 		expect(hyphalObject).toBeDefined();
 	});
 
 	it('should create a hyphal object with a custom namespace', async () => {
 		const id = env.SQL.idFromName('/custom-namespace');
 		const stub = env.SQL.get(id);
-		const hyphalObject = await runInDurableObject(stub, (instance: SQLiteDurableObject) => {
-			return new HyphalObject(instance.ctx.storage.sql);
-		});
+		const hyphalObject = await runInDurableObject(
+			stub,
+			(instance: SQLiteDurableObject) => {
+				return new HyphalObject(instance.ctx.storage.sql);
+			}
+		);
 		expect(hyphalObject).toBeDefined();
 	});
 
@@ -29,23 +35,29 @@ describe('HyphalObject', () => {
 		const stub = env.SQL.get(id);
 
 		// First call: Store a vector
-		const vectorId = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
-			const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
-			const result = await hyphalObject.execute('put', {
-				namespace: 'test-persistence',
-				content: 'persistence test content',
-				vector: [0.5, 0.6, 0.7],
-			});
-			return result.id;
-		});
+		const vectorId = await runInDurableObject(
+			stub,
+			async (instance: SQLiteDurableObject) => {
+				const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+				const result = await hyphalObject.execute('put', {
+					namespace: 'test-persistence',
+					content: 'persistence test content',
+					vector: [0.5, 0.6, 0.7],
+				});
+				return result.id;
+			}
+		);
 
 		expect(vectorId).toBeDefined();
 
 		// Second call: Retrieve the vector
-		const vector = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
-			const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
-			return await hyphalObject.execute('get', { id: vectorId });
-		});
+		const vector = await runInDurableObject(
+			stub,
+			async (instance: SQLiteDurableObject) => {
+				const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+				return await hyphalObject.execute('get', { id: vectorId });
+			}
+		);
 
 		expect(vector).toBeDefined();
 		expect(vector.id).toBe(vectorId);
@@ -63,15 +75,18 @@ describe('HyphalObject', () => {
 		const stub = env.SQL.get(id);
 
 		// First: Store a vector
-		const vectorId = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
-			const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
-			const result = await hyphalObject.execute('put', {
-				namespace: 'test-recreate',
-				content: 'recreate test content',
-				vector: [0.8, 0.9, 1.0],
-			});
-			return result.id;
-		});
+		const vectorId = await runInDurableObject(
+			stub,
+			async (instance: SQLiteDurableObject) => {
+				const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+				const result = await hyphalObject.execute('put', {
+					namespace: 'test-recreate',
+					content: 'recreate test content',
+					vector: [0.8, 0.9, 1.0],
+				});
+				return result.id;
+			}
+		);
 
 		expect(vectorId).toBeDefined();
 
@@ -80,10 +95,13 @@ describe('HyphalObject', () => {
 		const sameStub = env.SQL.get(sameId);
 
 		// Retrieve the vector from the "new" Durable Object instance
-		const vector = await runInDurableObject(sameStub, async (instance: SQLiteDurableObject) => {
-			const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
-			return await hyphalObject.execute('get', { id: vectorId });
-		});
+		const vector = await runInDurableObject(
+			sameStub,
+			async (instance: SQLiteDurableObject) => {
+				const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+				return await hyphalObject.execute('get', { id: vectorId });
+			}
+		);
 
 		expect(vector).toBeDefined();
 		expect(vector.id).toBe(vectorId);
@@ -111,7 +129,10 @@ describe('HyphalObject', () => {
 			// Opposite vectors should have similarity -1
 			const vecE = [1, 2, 3];
 			const vecF = [-1, -2, -3];
-			expect(HyphalObject.cosineSimilarity(vecE, vecF)).toBeCloseTo(-1, 5);
+			expect(HyphalObject.cosineSimilarity(vecE, vecF)).toBeCloseTo(
+				-1,
+				5
+			);
 
 			// Zero vectors should have similarity 0
 			const vecG = [0, 0, 0];

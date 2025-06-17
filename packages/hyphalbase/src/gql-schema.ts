@@ -1,6 +1,6 @@
 import { HyphalObject } from './hyphal_object';
 
-const schema = (outer: any & { hyphal_object: HyphalObject }) => ({
+const schema = (outer: any & { hyphal_object?: HyphalObject }) => ({
 	typeDefs: /* GraphQL */ `
 		type Query {
 			getVector(id: String!): Vector
@@ -60,13 +60,21 @@ const schema = (outer: any & { hyphal_object: HyphalObject }) => ({
 				return await outer.hyphal_object.execute('embed', { content });
 			},
 			searchVectors: async (_, { vector, topN }) => {
-				return await outer.hyphal_object.execute('search', { vector, topN });
+				return await outer.hyphal_object.execute('search', {
+					vector,
+					topN,
+				});
 			},
 		},
 		Mutation: {
 			putVector: async (_, { input }) => {
 				const { id, namespace, content, vector } = input;
-				return await outer.hyphal_object.execute('put', { id, namespace, content, vector });
+				return await outer.hyphal_object.execute('put', {
+					id,
+					namespace,
+					content,
+					vector,
+				});
 			},
 			deleteVector: async (_, { id }) => {
 				return await outer.hyphal_object.execute('delete', { id });
