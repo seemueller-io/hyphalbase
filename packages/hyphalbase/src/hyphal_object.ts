@@ -1,7 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { generateEmbedding } from './embed';
 
-
 export interface PutVectorInput {
 	/** Optional UUID; server autogenerates if omitted */
 	id?: string;
@@ -35,7 +34,6 @@ export interface ScoredRow {
 }
 
 export interface SearchResponse extends Array<ScoredRow> {}
-
 
 // Internal helper for simple success messages
 interface OkMessage {
@@ -93,39 +91,44 @@ function createTable(sql: SqlStorage) {
 		`);
 }
 
-
-type InsertVectorArgs = {sql: SqlStorage, id: string, namespace: string, blob: Buffer, content: string}
+type InsertVectorArgs = { sql: SqlStorage; id: string; namespace: string; blob: Buffer; content: string };
 function insertVector(args: InsertVectorArgs) {
 	const { sql, id, namespace, blob, content } = args;
 	return sql.exec(
 		`INSERT
 		OR REPLACE INTO vectors (id, namespace, vectors, content) VALUES (?, ?, ?, ?)`,
-		id, namespace, blob, content
+		id,
+		namespace,
+		blob,
+		content,
 	);
 }
-type GetVectorArgs = {sql: SqlStorage, id: string};
+type GetVectorArgs = { sql: SqlStorage; id: string };
 function getVector(args: GetVectorArgs) {
 	const { sql, id } = args;
 	return sql.exec(
 		`SELECT id, namespace, vectors, content
 		 FROM vectors
 		 WHERE id = ?`,
-		[id]
+		[id],
 	);
 }
 
-type DeleteVectorArgs = {sql: SqlStorage, id: string};
+type DeleteVectorArgs = { sql: SqlStorage; id: string };
 function deleteVector(args: DeleteVectorArgs) {
 	const { sql, id } = args;
-	return sql.exec(`DELETE
+	return sql.exec(
+		`DELETE
 									 FROM vectors
-									 WHERE id = ?`, [id]);
+									 WHERE id = ?`,
+		[id],
+	);
 }
 
 function getAllVectors(sql: SqlStorage) {
 	return sql.exec(
 		`SELECT id, namespace, vectors, content
-		 FROM vectors`
+		 FROM vectors`,
 	);
 }
 
@@ -135,28 +138,28 @@ function deleteAllVectors(sql: SqlStorage) {
 }
 
 export class HyphalObject {
-
 	constructor(private sql: SqlStorage) {
 		createTable(sql);
 	}
 
 	private async query<Op extends keyof OperationMap>(
 		operation: Op,
-		payload: OperationMap[Op]['payload']
+		payload: OperationMap[Op]['payload'],
 	): Promise<OperationMap[Op]['response']> {
 		return this.execute(operation, payload);
 	}
 
-	async execute<Op extends keyof OperationMap>(operation: Op, payload: OperationMap[keyof OperationMap]['payload']): Promise<OperationMap[Op]['response']> {
+	async execute<Op extends keyof OperationMap>(
+		operation: Op,
+		payload: OperationMap[keyof OperationMap]['payload'],
+	): Promise<OperationMap[Op]['response']> {
 		switch (operation) {
 			case 'put': {
 				let { id, namespace, vector, content } = payload as PutPayload;
 
-
 				if (!id) {
 					id = uuidv4();
 				}
-
 
 				const blob = Buffer.from(this.encodeVectorToBlob(vector));
 
@@ -165,36 +168,32 @@ export class HyphalObject {
 					namespace,
 					blob,
 					content,
-					sql: this.sql
+					sql: this.sql,
 				});
 
-				return { id }
+				return { id };
 			}
 			case 'get': {
 				const { id } = payload as GetPayload;
 
 				const cursor = getVector({
 					id: id,
-					sql: this.sql
+					sql: this.sql,
 				});
-
 
 				const results = [];
 				for (const row of cursor) {
 					results.push(row);
 				}
 
-
 				if (results.length === 0) {
-					throw'Vector not found'
+					throw 'Vector not found';
 				}
-
 
 				const row = results[0];
 				if (!row || !row.vectors) {
-					throw 'Vector data is corrupted or missing'
+					throw 'Vector data is corrupted or missing';
 				}
-
 
 				let vector;
 				try {
@@ -205,11 +204,11 @@ export class HyphalObject {
 				}
 
 				return <GetVectorResponse>{
-						id: row.id,
-						namespace: row.namespace,
-						vector: vector,
-						content: row.content
-				}
+					id: row.id,
+					namespace: row.namespace,
+					vector: vector,
+					content: row.content,
+				};
 			}
 
 			case 'delete': {
@@ -218,11 +217,11 @@ export class HyphalObject {
 				try {
 					deleteVector({
 						id,
-						sql: this.sql
+						sql: this.sql,
 					});
-					return { message: 'Delete Succeeded' }
+					return { message: 'Delete Succeeded' };
 				} catch (error) {
-					return { message: 'Delete Failed' }
+					return { message: 'Delete Failed' };
 				}
 			}
 
@@ -232,8 +231,8 @@ export class HyphalObject {
 				const embeddings = await HyphalObject.embed(content);
 
 				return <EmbedResponse>{
-					embeddings
-				}
+					embeddings,
+				};
 			}
 
 			case 'search': {
@@ -245,37 +244,36 @@ export class HyphalObject {
 
 				const topResults = topN ? scoredRows.slice(0, topN) : scoredRows;
 
-				return topResults
+				return topResults;
 			}
 
 			case 'deleteAll': {
 				deleteAllVectors(this.sql);
 
-				return { message: 'All vectors deleted successfully' }
+				return { message: 'All vectors deleted successfully' };
 			}
 
 			default:
-				return {message: 'Invalid operation'}
+				return { message: 'Invalid operation' };
 		}
 	}
 
 	private async scoreRows(rows: SqlStorageCursor<Record<string, SqlStorageValue>>, embeddedQuery: number[]): Promise<SearchResponse> {
 		// @ts-ignore - map is valid
-		return rows.map((row) => ({
-			row,
-			vectors: HyphalObject.decodeRowToVector(row)
-		}))
+		return rows
+			.map((row) => ({
+				row,
+				vectors: HyphalObject.decodeRowToVector(row),
+			}))
 			.map(({ row, vectors }) => {
 				return {
 					id: row.id,
 					namespace: row.namespace,
 					content: row.content,
-					score: HyphalObject.cosineSimilarity(embeddedQuery, vectors)
+					score: HyphalObject.cosineSimilarity(embeddedQuery, vectors),
 				};
 			})
-			.sort(
-				this.sort
-			);
+			.sort(this.sort);
 	}
 
 	private sort(prev: { score: number }, next: { score: number }) {
@@ -292,7 +290,6 @@ export class HyphalObject {
 	}
 
 	static decodeBlobToVector(blob: ArrayBuffer | Uint8Array): number[] {
-
 		if (blob instanceof ArrayBuffer) {
 			blob = new Uint8Array(blob);
 		}
@@ -300,7 +297,6 @@ export class HyphalObject {
 		if (!(blob instanceof Uint8Array)) {
 			throw new TypeError('Invalid blob data for decoding.');
 		}
-
 
 		const buffer = blob.buffer.slice(blob.byteOffset, blob.byteOffset + blob.byteLength);
 		const view = new Float32Array(buffer);
@@ -312,13 +308,11 @@ export class HyphalObject {
 			const { vectors } = row;
 			return HyphalObject.decodeBlobToVector(vectors);
 		} catch (error) {
-			throw "Failed to decode row to vector\n" + error;
+			throw 'Failed to decode row to vector\n' + error;
 		}
 	}
 
-
 	static embed = generateEmbedding;
-
 
 	static cosineSimilarity(vecA: number[], vecB: number[]): number {
 		let dotProduct = 0;

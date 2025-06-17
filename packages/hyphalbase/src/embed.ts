@@ -13,15 +13,14 @@ export const generateEmbedding = async (value: string): Promise<number[]> => {
 		});
 
 		const input = value.replaceAll('\n', ' ');
-		console.log("Generating embedding");
+		console.log('Generating embedding');
 		const { data } = await openai.embeddings.create({
 			model: 'text-embedding-ada-002',
 			input,
 		});
 		return data[0].embedding;
 	} catch (error) {
-		console.error("Error generating embeddings.", error)
+		console.error('Error generating embeddings.', error);
 		throw error;
 	}
-
 };

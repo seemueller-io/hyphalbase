@@ -14,7 +14,7 @@ export class SQLiteDurableObject implements DurableObject {
 		// Create GraphQL Yoga server
 		this.yoga = createYoga({
 			schema,
-			graphiql: true // Enable GraphiQL for easy testing
+			graphiql: true, // Enable GraphiQL for easy testing
 		});
 	}
 
@@ -29,19 +29,19 @@ export default <ExportedHandler<Env>>{
 		const url = new URL(request.url);
 
 		// Handle GraphQL requests at /graphql path
-		if (url.pathname === "/graphql") {
+		if (url.pathname === '/graphql') {
 			// Use the SQLiteDurableObject for GraphQL requests
-			const id = env.SQL.idFromName("graphql");
+			const id = env.SQL.idFromName('graphql');
 			const stub = env.SQL.get(id);
 			return stub.fetch(request);
 		}
 
 		// Legacy endpoint - return 400 for backward compatibility testing
-		if (url.pathname === "/sql") {
-			return new Response("Bad Request", { status: 400 });
+		if (url.pathname === '/sql') {
+			return new Response('Bad Request', { status: 400 });
 		}
 
 		// Return 404 for unknown paths
-		return new Response("Not Found", { status: 404 });
+		return new Response('Not Found', { status: 404 });
 	},
 };

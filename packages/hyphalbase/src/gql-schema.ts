@@ -1,6 +1,6 @@
 import { HyphalObject } from './hyphal_object';
 
-const schema = (outer: any & {hyphal_object: HyphalObject}) =>  ({
+const schema = (outer: any & { hyphal_object: HyphalObject }) => ({
 	typeDefs: /* GraphQL */ `
 		type Query {
 			getVector(id: String!): Vector
@@ -20,7 +20,6 @@ const schema = (outer: any & {hyphal_object: HyphalObject}) =>  ({
 			content: String!
 			vector: [Float!]!
 		}
-
 
 		type PutVectorResponse {
 			id: String!
@@ -62,7 +61,7 @@ const schema = (outer: any & {hyphal_object: HyphalObject}) =>  ({
 			},
 			searchVectors: async (_, { vector, topN }) => {
 				return await outer.hyphal_object.execute('search', { vector, topN });
-			}
+			},
 		},
 		Mutation: {
 			putVector: async (_, { input }) => {
@@ -74,9 +73,9 @@ const schema = (outer: any & {hyphal_object: HyphalObject}) =>  ({
 			},
 			deleteAllVectors: async () => {
 				return await outer.hyphal_object.execute('deleteAll', {});
-			}
-		}
-	}
+			},
+		},
+	},
 });
 
 export default schema;
