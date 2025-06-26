@@ -175,3 +175,5 @@ dist
 prompt.md
 todo
 **/schema.graphql
+
+/target/
