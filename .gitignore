@@ -177,3 +177,4 @@ todo
 **/schema.graphql
 
 /target/
+crates/embeddings-server/.fastembed_cache/
