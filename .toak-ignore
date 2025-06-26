@@ -19,5 +19,5 @@ scripts/test_*.js
 .junie/guidelines.md
 
 # Optional: ignore large object files if not needed
-packages/hyphalbase/src/hyphal_object.ts
-packages/hyphalbase-legacy/src/hyphal_object.ts
+packages/hyphalbase/src/hyphal-object.ts
+packages/hyphalbase-legacy/src/hyphal-object.ts
