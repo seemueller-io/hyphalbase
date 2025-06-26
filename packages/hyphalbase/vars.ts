@@ -8,10 +8,19 @@ const defaults = {
   debug: false,
 };
 
-const OPENAI_API_KEY = process.env['OPENAI_API_KEY'] ?? defaults.openaiApiKey;
-const OPENAI_API_ENDPOINT = process.env['OPENAI_API_ENDPOINT'] ?? defaults.openaiEndpoint;
-const EMBEDDINGS_MODEL = process.env['EMBEDDINGS_MODEL'] ?? defaults.embeddingsModel;
-// Enable debug logging only if DEBUG environment variable is set to 'true'
-const DEBUG = process.env['DEBUG'] === 'true' || defaults.debug;
+export function getProcess() {
+  const OPENAI_API_KEY = process.env['OPENAI_API_KEY'] ?? defaults.openaiApiKey;
+  const OPENAI_API_ENDPOINT = process.env['OPENAI_API_ENDPOINT'] ?? defaults.openaiEndpoint;
+  const EMBEDDINGS_MODEL = process.env['EMBEDDINGS_MODEL'] ?? defaults.embeddingsModel;
+  // Enable debug logging only if DEBUG environment variable is set to 'true'
+  const DEBUG = process.env['DEBUG'] === 'true' || defaults.debug;
 
-export { OPENAI_API_KEY, OPENAI_API_ENDPOINT, EMBEDDINGS_MODEL, DEBUG };
+  return {
+    env: {
+      OPENAI_API_KEY,
+      OPENAI_API_ENDPOINT,
+      EMBEDDINGS_MODEL,
+      DEBUG,
+    },
+  };
+}

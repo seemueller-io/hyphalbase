@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 
-import { EMBEDDINGS_MODEL, OPENAI_API_ENDPOINT, OPENAI_API_KEY, DEBUG } from '../vars';
+import { getProcess } from '../vars';
 
 // not robust but will get the job done for now
 // TODO: add more robust cleaning to reduce noise
@@ -14,11 +14,12 @@ function cleanInput(value: string) {
  * @returns A Promise that resolves to an array of numbers (the embedding)
  */
 export const generateEmbedding = async (value: string | Array<string>): Promise<number[]> => {
+  const process = getProcess();
   try {
     // Initialize OpenAI client lazily to avoid errors when importing but not using this function
     const openai = new OpenAI({
-      apiKey: OPENAI_API_KEY,
-      baseURL: OPENAI_API_ENDPOINT,
+      apiKey: process.env.OPENAI_API_KEY,
+      baseURL: process.env.OPENAI_API_ENDPOINT,
     });
     const cleanedInput = [];
     if (Array.isArray(value)) {
@@ -30,11 +31,11 @@ export const generateEmbedding = async (value: string | Array<string>): Promise<
     }
 
     const embeddingsRequestPayload = {
-      model: EMBEDDINGS_MODEL,
+      model: process.env.EMBEDDINGS_MODEL,
       input: cleanedInput,
       dimensions: 768,
     };
-    // @ts-expect-error - compiler is unhappy about encoding_format union
+
     const { data } = await openai.embeddings.create(embeddingsRequestPayload, {
       __binaryResponse: false,
     });
@@ -46,7 +47,7 @@ export const generateEmbedding = async (value: string | Array<string>): Promise<
     const originalZeroValues = result.filter(x => x === 0).length;
     const originalNanValues = result.filter(x => Number.isNaN(x)).length;
 
-    if (DEBUG) {
+    if (process.env.DEBUG) {
       console.log(
         `[DEBUG_LOG] Original embedding: length=${result.length}, zeros=${originalZeroValues}, NaNs=${originalNanValues}`,
       );
@@ -58,7 +59,7 @@ export const generateEmbedding = async (value: string | Array<string>): Promise<
     const tooManyZeros = originalZeroValues > result.length * 0.5; // More than 50% zeros
 
     if (allZeros || tooManyZeros) {
-      if (DEBUG) {
+      if (process.env.DEBUG) {
         console.log(
           `[DEBUG_LOG] Embedding has too many zeros (${originalZeroValues}/${result.length}). Generating random non-zero embedding.`,
         );
@@ -80,7 +81,7 @@ export const generateEmbedding = async (value: string | Array<string>): Promise<
       const norm = Math.sqrt(result.reduce((sum, val) => sum + val * val, 0));
       result = result.map(val => val / norm);
 
-      if (DEBUG) {
+      if (process.env.DEBUG) {
         console.log(
           `[DEBUG_LOG] Generated random embedding: length=${result.length}, first values=${JSON.stringify(result.slice(0, 5))}`,
         );
@@ -94,7 +95,7 @@ export const generateEmbedding = async (value: string | Array<string>): Promise<
         const padding = Array(expectedDimension - result.length).fill(0);
         result = [...result, ...padding];
 
-        if (DEBUG) {
+        if (process.env.DEBUG) {
           console.log(
             `[DEBUG_LOG] Padded embedding from ${result.length - padding.length} to ${result.length} dimensions`,
           );
@@ -106,16 +107,16 @@ export const generateEmbedding = async (value: string | Array<string>): Promise<
     const zeroValues = result.filter(x => x === 0).length;
     const nanValues = result.filter(x => Number.isNaN(x)).length;
 
-    if (DEBUG) {
+    if (process.env.DEBUG) {
       console.log(
         `[DEBUG_LOG] Final embedding: length=${result.length}, zeros=${zeroValues}, NaNs=${nanValues}`,
       );
     }
 
     // Log warnings about problematic embeddings only in debug mode
-    if (DEBUG && zeroValues > 0)
+    if (process.env.DEBUG && zeroValues > 0)
       console.log(`[DEBUG_LOG] Warning: ${zeroValues} zero values found in embedding`);
-    if (DEBUG && nanValues > 0)
+    if (process.env.DEBUG && nanValues > 0)
       console.log(`[DEBUG_LOG] Warning: ${nanValues} NaN values found in embedding`);
 
     return result;
