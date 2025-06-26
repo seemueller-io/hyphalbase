@@ -15,8 +15,12 @@ import { GET_VECTOR, SEARCH_VECTORS, PUT_VECTOR, DELETE_VECTOR } from './operati
 export class HyphalbaseClient {
   private client: GraphQLClient;
 
-  constructor(endpoint: string, headers?: HeadersInit) {
-    this.client = new GraphQLClient(endpoint, { headers });
+  constructor(endpoint: string, token?: string, headers?: HeadersInit) {
+    const finalHeaders = { ...headers };
+    if (token) {
+      finalHeaders['X-API-Key'] = token;
+    }
+    this.client = new GraphQLClient(endpoint, { headers: finalHeaders });
   }
 
   /**

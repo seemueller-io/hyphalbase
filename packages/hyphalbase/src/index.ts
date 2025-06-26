@@ -1,48 +1,104 @@
 import { createYoga, createSchema } from 'graphql-yoga';
 
-import Schema from './gql-schema';
+import AdminSchema from './admin-schema';
+import Schema from './api-schema';
+import { Gateway } from './gateway';
 import { HyphalObject } from './hyphal-object';
 export class SQLiteDurableObject implements DurableObject {
+  gateway: Gateway;
   hyphal_object: HyphalObject;
-  yoga;
+  api;
+  adminApi;
 
   constructor(readonly ctx: DurableObjectState) {
+    this.gateway = new Gateway(ctx.storage.sql);
     this.hyphal_object = new HyphalObject(ctx.storage.sql);
 
     // Create GraphQL schema based on HyphalObject interface
-    const schema = createSchema(Schema(this));
+    const apiSchema = createSchema(Schema(this));
+    const adminApiSchema = createSchema(AdminSchema(this));
 
-    // Create GraphQL Yoga server
-    this.yoga = createYoga({
-      schema,
-      graphiql: true, // Enable GraphiQL for easy testing
+    // admin api for managing users
+    this.adminApi = createYoga({
+      schema: adminApiSchema,
+      graphqlEndpoint: '/graphql',
+      graphiql: {
+        endpoint: '/graphql',
+      },
+    });
+
+    // core api features for vectors
+    this.api = createYoga({
+      schema: apiSchema,
+      context: options => {
+        const apiKey = options.request.headers.get('X-API-Key');
+        return {
+          apiKey,
+        };
+      },
+      graphqlEndpoint: '/graphql',
+      graphiql: {
+        endpoint: '/graphql',
+      },
     });
   }
 
-  fetch(request: Request) {
-    // Handle GraphQL requests
-    return this.yoga.fetch(request);
+  async fetch(request: Request) {
+    const url = new URL(request.url);
+    const path = url.pathname;
+    console.log({ path });
+
+    // Handle SQL endpoint for backward compatibility
+    if (path === '/sql') {
+      return new Response('Bad Request', { status: 400 });
+    }
+
+    if (path === '/' || path === '/graphql' || path === '/igraphql') {
+      console.log('serve admin');
+
+      // If it's a POST request, check if it's for user management or API key validation
+      if (request.method === 'POST') {
+        // Clone the request to read its body
+        const clonedRequest = request.clone();
+        try {
+          const body: any = await clonedRequest.json();
+
+          // Check if the request is for user management or API key validation operations
+          // These operations don't require an API key
+          const isUserManagementOrApiKeyValidation =
+            body?.query &&
+            (body?.query.includes('createUser') ||
+              body?.query.includes('createApiKeyForUser') ||
+              body?.query.includes('validateApiKey') ||
+              body?.query.includes('getAllUserKeys'));
+
+          if (isUserManagementOrApiKeyValidation) {
+            return this.adminApi.fetch(request);
+          }
+
+          // Check if the request is for a mutation or query that's in the API schema
+
+          // Route to the API schema
+        } catch (e) {
+          // If we can't parse the body as JSON, just continue with the admin API
+        }
+      }
+      return this.adminApi.fetch(request);
+    }
+
+    return this.api.fetch(request);
   }
 }
 
 export default <ExportedHandler<Env>>{
   fetch(request, env) {
-    const url = new URL(request.url);
-
     // Handle GraphQL requests at /graphql path
-    if (url.pathname === '/graphql') {
-      // Use the SQLiteDurableObject for GraphQL requests
-      const id = env.SQL.idFromName('graphql');
-      const stub = env.SQL.get(id);
-      return stub.fetch(request);
-    }
+    // Use the SQLiteDurableObject for GraphQL requests
+    const id = env.SQL.idFromName('graphql');
+    const stub = env.SQL.get(id);
+    const result = stub.fetch(request);
+    return result;
 
     // Legacy endpoint - return 400 for backward compatibility testing
-    if (url.pathname === '/sql') {
-      return new Response('Bad Request', { status: 400 });
-    }
-
-    // Return 404 for unknown paths
-    return new Response('Not Found', { status: 404 });
   },
 };

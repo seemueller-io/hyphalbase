@@ -10,7 +10,7 @@
     "clean": "scripts/cleanup.sh",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
-    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md}\"",
+    "format": "prettier . --write",
     "test": "(cd packages/hyphalbase; pnpm run test)",
     "embeddings-server:start": "(cd crates/embeddings-server && cargo run)"
   },

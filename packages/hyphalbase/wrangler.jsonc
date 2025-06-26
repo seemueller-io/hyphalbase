@@ -1,24 +1,22 @@
 {
-	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "durable-objects",
-	"main": "src/index.ts",
-	"compatibility_date": "2025-06-01",
-	"compatibility_flags": ["nodejs_compat", "nodejs_compat_populate_process_env"],
-	"durable_objects": {
-		"bindings": [
-			{
-				"name": "SQL",
-				"class_name": "SQLiteDurableObject"
-			}
-		]
-	},
-	"migrations": [
-		{
-			"tag": "v1",
-			"new_classes": [],
-			"new_sqlite_classes": [
-				"SQLiteDurableObject"
-			]
-		}
-	]
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hyphalbase",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-06-01",
+  "compatibility_flags": ["nodejs_compat", "nodejs_compat_populate_process_env"],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SQL",
+        "class_name": "SQLiteDurableObject",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": [],
+      "new_sqlite_classes": ["SQLiteDurableObject"],
+    },
+  ],
 }

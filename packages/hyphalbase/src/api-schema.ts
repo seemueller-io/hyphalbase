@@ -1,4 +1,52 @@
+import { GraphQLError } from 'graphql';
+
 import { HyphalObject } from './hyphal-object';
+
+interface Context {
+  apiKey?: string;
+}
+
+interface GraphQLResolverInfo {
+  fieldName: string;
+  fieldNodes: any[];
+  returnType: any;
+  parentType: any;
+  path: any;
+  schema: any;
+  fragments: any;
+  rootValue: any;
+  operation: any;
+  variableValues: any;
+}
+
+type ResolverFunction<TArgs = any, TResult = any> = (
+  parent: any,
+  args: TArgs,
+  context: Context,
+  info: GraphQLResolverInfo,
+) => Promise<TResult> | TResult;
+
+// Protected wrapper function
+const protectedOp = <TArgs = any, TResult = any>(
+  outer: any,
+  resolver: ResolverFunction<TArgs, TResult>,
+): ResolverFunction<TArgs, TResult> => {
+  return async (parent: any, args: TArgs, context: Context, info: GraphQLResolverInfo) => {
+    const { apiKey } = context;
+
+    // Validate API key if provided
+    if (apiKey) {
+      const { isValid } = await outer.gateway.execute('validate_api_key', { apiKey });
+      if (!isValid) {
+        throw new GraphQLError('Invalid API key');
+        // throw new Error('Invalid API key');
+      }
+    }
+
+    // Execute the original resolver
+    return resolver(parent, args, context, info);
+  };
+};
 
 const schema = (outer: any & { hyphal_object?: HyphalObject }) => ({
   typeDefs: /* GraphQL */ `
@@ -76,23 +124,23 @@ const schema = (outer: any & { hyphal_object?: HyphalObject }) => ({
   `,
   resolvers: {
     Query: {
-      getVector: async (_, { id }) => {
+      getVector: protectedOp(outer, async (_, { id }) => {
         try {
           return await outer.hyphal_object.execute('get', { id });
         } catch (error) {
           return null;
         }
-      },
-      embed: async (_, { content }) => {
+      }),
+      embed: protectedOp(outer, async (_, { content }) => {
         return await outer.hyphal_object.execute('embed', { content });
-      },
-      searchVectors: async (_, { vector, topN }) => {
+      }),
+      searchVectors: protectedOp(outer, async (_, { vector, topN }) => {
         return await outer.hyphal_object.execute('search', {
           vector,
           topN,
         });
-      },
-      getDocument: async (_, { id }) => {
+      }),
+      getDocument: protectedOp(outer, async (_, { id }) => {
         try {
           return await outer.hyphal_object.execute('getDocument', {
             id,
@@ -100,16 +148,16 @@ const schema = (outer: any & { hyphal_object?: HyphalObject }) => ({
         } catch (error) {
           return null;
         }
-      },
-      searchDocuments: async (_, { query, topN }) => {
+      }),
+      searchDocuments: protectedOp(outer, async (_, { query, topN }) => {
         return await outer.hyphal_object.execute('searchDocuments', {
           query,
           topN,
         });
-      },
+      }),
     },
     Mutation: {
-      putVector: async (_, { input }) => {
+      putVector: protectedOp(outer, async (_, { input }) => {
         const { id, namespace, content, vector } = input;
         return await outer.hyphal_object.execute('put', {
           id,
@@ -117,26 +165,26 @@ const schema = (outer: any & { hyphal_object?: HyphalObject }) => ({
           content,
           vector,
         });
-      },
-      deleteVector: async (_, { ids }) => {
+      }),
+      deleteVector: protectedOp(outer, async (_, { ids }) => {
         return await outer.hyphal_object.execute('delete', { ids });
-      },
-      deleteAllVectors: async () => {
+      }),
+      deleteAllVectors: protectedOp(outer, async () => {
         return await outer.hyphal_object.execute('deleteAll', {});
-      },
-      storeDocument: async (_, { input }) => {
+      }),
+      storeDocument: protectedOp(outer, async (_, { input }) => {
         const { id, namespace, content } = input;
         return await outer.hyphal_object.execute('storeDocument', {
           id,
           namespace,
           content,
         });
-      },
-      deleteDocument: async (_, { ids }) => {
+      }),
+      deleteDocument: protectedOp(outer, async (_, { ids }) => {
         return await outer.hyphal_object.execute('deleteDocument', {
           ids,
         });
-      },
+      }),
     },
   },
 });
