@@ -39,9 +39,21 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Check if embeddings-server binary exists
+        id: check-binary
+        run: |
+          if [ -f "target/debug/embeddings-server" ]; then
+            echo "Binary exists, skipping build"
+            echo "binary_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Binary does not exist, will build"
+            echo "binary_exists=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Build embeddings-server
+        if: steps.check-binary.outputs.binary_exists != 'true'
         run: cargo build --package embeddings-server
 
       - name: Start embeddings-server in background
