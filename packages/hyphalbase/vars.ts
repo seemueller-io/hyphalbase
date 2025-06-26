@@ -1,11 +1,11 @@
 const defaults = {
-	openaiApiKey: 'not-needed',
-	// default ollama endpoint
-	openaiEndpoint: 'http://localhost:8080/v1',
-	// https://ollama.com/library/nomic-embed-text
-	embeddingsModel: 'nomic-embed-text',
-	// default to no debug logging in production
-	debug: false,
+  openaiApiKey: 'not-needed',
+  // default ollama endpoint
+  openaiEndpoint: 'http://localhost:8080/v1',
+  // https://ollama.com/library/nomic-embed-text
+  embeddingsModel: 'nomic-embed-text',
+  // default to no debug logging in production
+  debug: false,
 };
 
 const OPENAI_API_KEY = process.env['OPENAI_API_KEY'] ?? defaults.openaiApiKey;

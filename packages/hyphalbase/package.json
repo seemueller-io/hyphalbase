@@ -1,31 +1,31 @@
 {
-	"name": "@hyphalbase/hyphalbase",
-	"private": true,
-	"type": "module",
-	"scripts": {
-		"dev": "wrangler dev",
-		"typegen": "wrangler types",
-		"test": "vitest run",
-		"postinstall": "wrangler types --include-runtime && pnpm dlx bun build.graphql-schema.ts && pnpm --filter \"*\" run generate",
-		"build": "wrangler build"
-	},
-	"dependencies": {
-		"graphql": "^16.8.1",
-		"graphql-yoga": "^5.0.0",
-		"uuid": "^9.0.1"
-	},
-	"devDependencies": {
-		"@cloudflare/vitest-pool-workers": "latest",
-		"@cloudflare/workers-types": "latest",
-		"@types/bun": "^1.2.16",
-		"@types/node": "20.19.0",
-		"@types/uuid": "^9.0.7",
-		"bun": "^1.2.16",
-		"miniflare": "^4.20250612.0",
-		"typescript": "latest",
-		"vite": "latest",
-		"vitest": "latest",
-		"wrangler": "latest",
-		"openai": "latest"
-	}
+  "name": "@hyphalbase/hyphalbase",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "typegen": "wrangler types",
+    "test": "vitest run",
+    "postinstall": "wrangler types --include-runtime && pnpm dlx bun build.graphql-schema.ts && pnpm --filter \"*\" run generate",
+    "build": "wrangler build"
+  },
+  "dependencies": {
+    "graphql": "^16.8.1",
+    "graphql-yoga": "^5.0.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "latest",
+    "@cloudflare/workers-types": "latest",
+    "@types/bun": "^1.2.16",
+    "@types/node": "20.19.0",
+    "@types/uuid": "^9.0.7",
+    "bun": "^1.2.16",
+    "miniflare": "^4.20250612.0",
+    "typescript": "latest",
+    "vite": "latest",
+    "vitest": "latest",
+    "wrangler": "latest",
+    "openai": "latest"
+  }
 }

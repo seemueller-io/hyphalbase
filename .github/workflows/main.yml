@@ -2,9 +2,9 @@ name: Build
 
 on:
   push:
-    branches: ["main"]
+    branches: ['main']
   pull_request:
-    branches: ["main"]
+    branches: ['main']
 
 jobs:
   build:
@@ -20,7 +20,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: "pnpm"
+          cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install
 
@@ -43,4 +43,4 @@ jobs:
       - name: Run tests
         run: pnpm test
         env:
-          OPENAI_API_ENDPOINT: "http://localhost:8080/v1"
+          OPENAI_API_ENDPOINT: 'http://localhost:8080/v1'

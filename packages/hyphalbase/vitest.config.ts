@@ -1,15 +1,16 @@
+// eslint-disable-next-line import/no-unresolved
 import { defineWorkersProject } from '@cloudflare/vitest-pool-workers/config';
 
 export default defineWorkersProject({
-	test: {
-		name: '@scoped/durable-objects',
-		poolOptions: {
-			workers: {
-				singleWorker: true,
-				wrangler: {
-					configPath: './wrangler.jsonc',
-				},
-			},
-		},
-	},
+  test: {
+    name: '@scoped/durable-objects',
+    poolOptions: {
+      workers: {
+        singleWorker: true,
+        wrangler: {
+          configPath: './wrangler.jsonc',
+        },
+      },
+    },
+  },
 });

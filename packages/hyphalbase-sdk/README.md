@@ -13,9 +13,7 @@ A typed client for Hyphalbase.
 [//]: # "import { HyphalbaseClient } from '@hyphalbase/graphql-client';"
 [//]: #
 [//]: # '// Create a client'
-[//]:
-	#
-	"const client = new HyphalbaseClient('https://your-hyphalbase-endpoint.com/graphql');"
+[//]: # "const client = new HyphalbaseClient('https://your-hyphalbase-endpoint.com/graphql');"
 [//]: #
 [//]: # '// Get a vector'
 [//]: # "const vector = await client.getVector('vector-id');"
@@ -34,9 +32,7 @@ A typed client for Hyphalbase.
 [//]: # "await client.deleteVector('vector-id');"
 [//]: # '```'
 [//]: #
-[//]:
-	#
-	'See [example.ts](./src/example.ts) for a complete example of how to use the client.'
+[//]: # 'See [example.ts](./src/example.ts) for a complete example of how to use the client.'
 [//]: #
 [//]: # '## Development'
 [//]: #
@@ -64,6 +60,4 @@ A typed client for Hyphalbase.
 [//]: # 'pnpm run example'
 [//]: # '```'
 [//]: #
-[//]:
-	#
-	'This will execute the example in `src/example.ts` which demonstrates how to use the client.'
+[//]: # 'This will execute the example in `src/example.ts` which demonstrates how to use the client.'

@@ -1,8 +1,10 @@
+import { writeFileSync } from 'node:fs';
+
+import { printSchema } from 'graphql';
+import { createSchema } from 'graphql-yoga';
+
 import GqlSchema from './src/gql-schema';
 import { HyphalObject } from './src/hyphal-object';
-import { createSchema } from 'graphql-yoga';
-import { printSchema } from 'graphql';
-import { writeFileSync } from 'node:fs';
 
 const gqlSchema = GqlSchema({ hyphal_object: new HyphalObject(undefined) });
 
