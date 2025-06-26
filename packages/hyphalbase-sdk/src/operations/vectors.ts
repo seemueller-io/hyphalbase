@@ -31,8 +31,8 @@ export const PUT_VECTOR = gql`
 `;
 
 export const DELETE_VECTOR = gql`
-  mutation DeleteVector($id: String!) {
-    deleteVector(id: $id) {
+  mutation DeleteVector($ids: [String!]!) {
+    deleteVector(ids: $ids) {
       message
     }
   }
