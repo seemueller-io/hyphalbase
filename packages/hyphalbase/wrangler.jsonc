@@ -6,15 +6,15 @@
 		"bindings": [
 			{
 				"name": "SQL",
-				"class_name": "SQLiteDurableObject"
-			}
-		]
+				"class_name": "SQLiteDurableObject",
+			},
+		],
 	},
 	"migrations": [
 		{
 			"tag": "v1",
 			"new_classes": [],
-			"new_sqlite_classes": ["SQLiteDurableObject"]
-		}
-	]
+			"new_sqlite_classes": ["SQLiteDurableObject"],
+		},
+	],
 }

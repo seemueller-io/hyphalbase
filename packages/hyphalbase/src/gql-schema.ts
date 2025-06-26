@@ -94,7 +94,9 @@ const schema = (outer: any & { hyphal_object?: HyphalObject }) => ({
 			},
 			getDocument: async (_, { id }) => {
 				try {
-					return await outer.hyphal_object.execute('getDocument', { id });
+					return await outer.hyphal_object.execute('getDocument', {
+						id,
+					});
 				} catch (error) {
 					return null;
 				}
@@ -131,7 +133,9 @@ const schema = (outer: any & { hyphal_object?: HyphalObject }) => ({
 				});
 			},
 			deleteDocument: async (_, { ids }) => {
-				return await outer.hyphal_object.execute('deleteDocument', { ids });
+				return await outer.hyphal_object.execute('deleteDocument', {
+					ids,
+				});
 			},
 		},
 	},

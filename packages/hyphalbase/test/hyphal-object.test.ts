@@ -123,18 +123,18 @@ describe('HyphalObject', () => {
 			{
 				namespace: 'test-bulk-1',
 				content: 'bulk test content 1',
-				vector: [0.1, 0.2, 0.3]
+				vector: [0.1, 0.2, 0.3],
 			},
 			{
 				namespace: 'test-bulk-2',
 				content: 'bulk test content 2',
-				vector: [0.4, 0.5, 0.6]
+				vector: [0.4, 0.5, 0.6],
 			},
 			{
 				namespace: 'test-bulk-3',
 				content: 'bulk test content 3',
-				vector: [0.7, 0.8, 0.9]
-			}
+				vector: [0.7, 0.8, 0.9],
+			},
 		];
 
 		// Insert vectors using bulkPut
@@ -143,7 +143,7 @@ describe('HyphalObject', () => {
 			async (instance: SQLiteDurableObject) => {
 				const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
 				return await hyphalObject.execute('bulkPut', {
-					vectors: testVectors
+					vectors: testVectors,
 				});
 			}
 		);
@@ -156,17 +156,23 @@ describe('HyphalObject', () => {
 			const vector = await runInDurableObject(
 				stub,
 				async (instance: SQLiteDurableObject) => {
-					const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+					const hyphalObject = new HyphalObject(
+						instance.ctx.storage.sql
+					);
 					// Get all vectors and find the one with matching content
 					const allVectors = await hyphalObject.execute('search', {
-						vector: testVectors[i].vector
+						vector: testVectors[i].vector,
 					});
 					// Find the vector with the highest similarity (should be the one we're looking for)
-					const matchingVector = allVectors.find(v => v.content === testVectors[i].content);
+					const matchingVector = allVectors.find(
+						v => v.content === testVectors[i].content
+					);
 					if (!matchingVector) {
 						throw new Error(`Vector ${i} not found`);
 					}
-					return await hyphalObject.execute('get', { id: matchingVector.id });
+					return await hyphalObject.execute('get', {
+						id: matchingVector.id,
+					});
 				}
 			);
 
@@ -177,7 +183,9 @@ describe('HyphalObject', () => {
 
 			// Check that vector values are approximately equal
 			for (let j = 0; j < testVectors[i].vector.length; j++) {
-				expect(Math.abs(vector.vector[j] - testVectors[i].vector[j])).toBeLessThan(0.0001);
+				expect(
+					Math.abs(vector.vector[j] - testVectors[i].vector[j])
+				).toBeLessThan(0.0001);
 			}
 		}
 	});
@@ -192,18 +200,18 @@ describe('HyphalObject', () => {
 			{
 				namespace: 'test-bulk-delete-1',
 				content: 'bulk delete test content 1',
-				vector: [0.1, 0.2, 0.3]
+				vector: [0.1, 0.2, 0.3],
 			},
 			{
 				namespace: 'test-bulk-delete-2',
 				content: 'bulk delete test content 2',
-				vector: [0.4, 0.5, 0.6]
+				vector: [0.4, 0.5, 0.6],
 			},
 			{
 				namespace: 'test-bulk-delete-3',
 				content: 'bulk delete test content 3',
-				vector: [0.7, 0.8, 0.9]
-			}
+				vector: [0.7, 0.8, 0.9],
+			},
 		];
 
 		// Insert vectors and collect their IDs
@@ -218,7 +226,7 @@ describe('HyphalObject', () => {
 					const result = await hyphalObject.execute('put', {
 						namespace: vector.namespace,
 						content: vector.content,
-						vector: vector.vector
+						vector: vector.vector,
 					});
 					ids.push(result.id);
 				}
@@ -234,9 +242,13 @@ describe('HyphalObject', () => {
 			const vector = await runInDurableObject(
 				stub,
 				async (instance: SQLiteDurableObject) => {
-					const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+					const hyphalObject = new HyphalObject(
+						instance.ctx.storage.sql
+					);
 					try {
-						return await hyphalObject.execute('get', { id: vectorIds[i] });
+						return await hyphalObject.execute('get', {
+							id: vectorIds[i],
+						});
 					} catch (error) {
 						return null;
 					}
@@ -262,9 +274,13 @@ describe('HyphalObject', () => {
 			const vector = await runInDurableObject(
 				stub,
 				async (instance: SQLiteDurableObject) => {
-					const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+					const hyphalObject = new HyphalObject(
+						instance.ctx.storage.sql
+					);
 					try {
-						return await hyphalObject.execute('get', { id: vectorIds[i] });
+						return await hyphalObject.execute('get', {
+							id: vectorIds[i],
+						});
 					} catch (error) {
 						return null;
 					}

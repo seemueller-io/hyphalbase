@@ -113,7 +113,10 @@ interface OperationMap {
 	delete: { payload: DeletePayload; response: OkMessage };
 	search: { payload: SearchPayload; response: ScoredRow[] };
 	deleteAll: { payload: DeleteAllPayload; response: OkMessage };
-	storeDocument: { payload: StoreDocumentPayload; response: StoreDocumentResponse };
+	storeDocument: {
+		payload: StoreDocumentPayload;
+		response: StoreDocumentResponse;
+	};
 	getDocument: { payload: GetPayload; response: DocumentResponse };
 	searchDocuments: { payload: SearchDocumentsPayload; response: ScoredRow[] };
 	deleteDocument: { payload: DeletePayload; response: OkMessage };
@@ -142,7 +145,15 @@ type InsertVectorArgs = {
 	is_chunk?: number;
 };
 function insertVector(args: InsertVectorArgs) {
-	const { sql, id, namespace, blob, content, parent_id = null, is_chunk = 0 } = args;
+	const {
+		sql,
+		id,
+		namespace,
+		blob,
+		content,
+		parent_id = null,
+		is_chunk = 0,
+	} = args;
 	return sql.exec(
 		`INSERT
 		OR REPLACE INTO vectors (id, namespace, vectors, content, parent_id, is_chunk) VALUES (?, ?, ?, ?, ?, ?)`,
@@ -185,7 +196,7 @@ function bulkDeleteVectors(args: BulkDeleteVectorsArgs) {
 	for (const id of ids) {
 		deleteVector({
 			id,
-			sql
+			sql,
 		});
 	}
 }
@@ -213,7 +224,7 @@ function deleteAllVectors(sql: SqlStorage) {
 
 export class HyphalObject {
 	constructor(private sql: SqlStorage) {
-		if(sql) {
+		if (sql) {
 			createTable(sql);
 		}
 	}
@@ -331,20 +342,22 @@ export class HyphalObject {
 				// Process each vector to ensure it has an ID and convert to the format expected by bulkInsertVectors
 				const processedVectors = vectors.map(vector => {
 					const id = vector.id || uuidv4();
-					const blob = Buffer.from(this.encodeVectorToBlob(vector.vector));
+					const blob = Buffer.from(
+						this.encodeVectorToBlob(vector.vector)
+					);
 
 					return {
 						id,
 						namespace: vector.namespace,
 						blob,
-						content: vector.content
+						content: vector.content,
 					};
 				});
 
 				// Insert all vectors in a single transaction
 				this.bulkInsertVectors({
 					sql: this.sql,
-					vectors: processedVectors
+					vectors: processedVectors,
 				});
 
 				return { message: 'Bulk insert succeeded' };
@@ -357,7 +370,8 @@ export class HyphalObject {
 			}
 
 			case 'storeDocument': {
-				let { id, namespace, content } = payload as StoreDocumentPayload;
+				let { id, namespace, content } =
+					payload as StoreDocumentPayload;
 
 				if (!id) {
 					id = uuidv4();
@@ -387,7 +401,7 @@ export class HyphalObject {
 					// Chunk the document
 					const chunks = chunkDocument(content, {
 						chunkSize: Math.floor(TOKEN_LIMIT * 0.8), // 80% of token limit for safety
-						overlap: Math.floor(TOKEN_LIMIT * 0.1),   // 10% overlap
+						overlap: Math.floor(TOKEN_LIMIT * 0.1), // 10% overlap
 					});
 
 					// Store metadata about the full document
@@ -395,9 +409,9 @@ export class HyphalObject {
 						id,
 						namespace,
 						blob: Buffer.from(new Uint8Array(0)), // Empty vector for the parent
-						content,                              // Store the full content in the parent
+						content, // Store the full content in the parent
 						sql: this.sql,
-						is_chunk: 0                           // This is the parent document
+						is_chunk: 0, // This is the parent document
 					});
 
 					// Store each chunk with a reference to the parent document
@@ -406,7 +420,9 @@ export class HyphalObject {
 
 						// Generate embedding for the chunk content
 						const vector = await HyphalObject.embed(chunk.text);
-						const blob = Buffer.from(this.encodeVectorToBlob(vector));
+						const blob = Buffer.from(
+							this.encodeVectorToBlob(vector)
+						);
 
 						// Store the chunk as a vector with reference to parent
 						insertVector({
@@ -457,7 +473,8 @@ export class HyphalObject {
 			}
 
 			case 'searchDocuments': {
-				const { query, namespace, topN } = payload as SearchDocumentsPayload;
+				const { query, namespace, topN } =
+					payload as SearchDocumentsPayload;
 
 				// Generate embedding for the search query
 				const queryVector = await HyphalObject.embed(query);
@@ -469,10 +486,13 @@ export class HyphalObject {
 				const scoredRows = await this.scoreRows(rows, queryVector);
 
 				// Process results to handle chunked documents
-				const processedResults = await this.processSearchResults(scoredRows);
+				const processedResults =
+					await this.processSearchResults(scoredRows);
 
 				// Sort by score (highest first)
-				const sortedResults = processedResults.sort((a, b) => b.score - a.score);
+				const sortedResults = processedResults.sort(
+					(a, b) => b.score - a.score
+				);
 
 				// Return top N results
 				const topResults = topN
@@ -539,7 +559,10 @@ export class HyphalObject {
 		return rowsArray
 			.map(row => ({
 				row,
-				vectors: row.vectors && row.vectors.byteLength > 0 ? HyphalObject.decodeRowToVector(row) : [],
+				vectors:
+					row.vectors && row.vectors.byteLength > 0
+						? HyphalObject.decodeRowToVector(row)
+						: [],
 			}))
 			.map(({ row, vectors }) => {
 				return {
@@ -548,10 +571,13 @@ export class HyphalObject {
 					content: row.content,
 					parent_id: row.parent_id,
 					is_chunk: row.is_chunk,
-					score: vectors.length > 0 ? HyphalObject.cosineSimilarity(
-						embeddedQuery,
-						vectors
-					) : 0,
+					score:
+						vectors.length > 0
+							? HyphalObject.cosineSimilarity(
+									embeddedQuery,
+									vectors
+								)
+							: 0,
 				};
 			})
 			.sort(this.sort);
@@ -562,7 +588,9 @@ export class HyphalObject {
 	 * @param scoredRows The scored rows from the search
 	 * @returns Processed search results with parent documents for chunks
 	 */
-	private async processSearchResults(scoredRows: SearchResponse): Promise<SearchResponse> {
+	private async processSearchResults(
+		scoredRows: SearchResponse
+	): Promise<SearchResponse> {
 		// Map to store the highest score for each document ID
 		const documentScores = new Map<string, number>();
 		// Map to store the document data for each ID
@@ -578,10 +606,15 @@ export class HyphalObject {
 				const parentId = row.parent_id;
 
 				// If we haven't seen this parent before, or this chunk has a higher score
-				if (!documentScores.has(parentId) || row.score > documentScores.get(parentId)!) {
+				if (
+					!documentScores.has(parentId) ||
+					row.score > documentScores.get(parentId)!
+				) {
 					// Get the parent document
 					try {
-						const parentDoc = await this.execute('getDocument', { id: parentId }) as DocumentResponse;
+						const parentDoc = (await this.execute('getDocument', {
+							id: parentId,
+						})) as DocumentResponse;
 
 						// Store the parent document with the chunk's score
 						documentScores.set(parentId, row.score);
@@ -589,10 +622,13 @@ export class HyphalObject {
 							id: parentId,
 							namespace: parentDoc.namespace,
 							content: parentDoc.content,
-							score: row.score
+							score: row.score,
 						});
 					} catch (error) {
-						console.error(`Error retrieving parent document ${parentId}:`, error);
+						console.error(
+							`Error retrieving parent document ${parentId}:`,
+							error
+						);
 					}
 				}
 			} else {
@@ -641,7 +677,6 @@ export class HyphalObject {
 			);
 		}
 	}
-
 
 	encodeVectorToBlob(vector: number[]): Uint8Array {
 		const buffer = new ArrayBuffer(
