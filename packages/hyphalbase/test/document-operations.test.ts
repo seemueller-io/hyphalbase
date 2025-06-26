@@ -173,4 +173,97 @@ describe('Document Operations', () => {
 
     expect(deletedDocument).toBeNull();
   });
+  // Test storing and retrieving a very large document
+  it('should store and retrieve a very large document', async () => {
+    const id = env.SQL.idFromName('/large-document-test');
+    const stub = env.SQL.get(id);
+
+    // Create a very large document that exceeds the token limit (8000 tokens)
+    // This is approximately 32,000 words or about 60 pages of text
+    let largeContent = '';
+    const paragraph = 'This is a test paragraph with enough words to help us generate a very large document. We need to exceed the token limit to test chunking. ';
+    // Generate about 10,000 tokens worth of content
+    for (let i = 0; i < 1000; i++) {
+      largeContent += paragraph + `This is paragraph number ${i}. `;
+    }
+
+    console.log(`[DEBUG_LOG] Created large document with length: ${largeContent.length} characters`);
+
+    // Store the large document
+    const documentId = await runInDurableObject(
+      stub,
+      async (instance: SQLiteDurableObject) => {
+        const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+        const result = await hyphalObject.execute('storeDocument', {
+          namespace: 'test-large-documents',
+          content: largeContent,
+        });
+        return result.id;
+      }
+    );
+
+    expect(documentId).toBeDefined();
+    console.log(`[DEBUG_LOG] Stored large document with ID: ${documentId}`);
+
+    // Retrieve the large document
+    const document = await runInDurableObject(
+      stub,
+      async (instance: SQLiteDurableObject) => {
+        const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+        return await hyphalObject.execute('getDocument', { id: documentId });
+      }
+    );
+
+    expect(document).toBeDefined();
+    expect(document.id).toBe(documentId);
+    expect(document.namespace).toBe('test-large-documents');
+    expect(document.content).toBe(largeContent);
+    console.log(`[DEBUG_LOG] Retrieved large document with length: ${document.content.length} characters`);
+
+    // Search for content within the large document
+    const searchResults = await runInDurableObject(
+      stub,
+      async (instance: SQLiteDurableObject) => {
+        const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+        return await hyphalObject.execute('searchDocuments', {
+          query: 'paragraph number 500',
+          namespace: 'test-large-documents',
+          topN: 1
+        });
+      }
+    );
+
+    expect(searchResults).toBeDefined();
+    expect(searchResults.length).toBe(1);
+    expect(searchResults[0].id).toBe(documentId);
+    console.log(`[DEBUG_LOG] Successfully searched within large document`);
+
+    // Delete the large document
+    const deleteResult = await runInDurableObject(
+      stub,
+      async (instance: SQLiteDurableObject) => {
+        const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+        return await hyphalObject.execute('deleteDocument', { ids: [documentId] });
+      }
+    );
+
+    expect(deleteResult).toBeDefined();
+    expect(deleteResult.message).toBe('Delete Succeeded');
+    console.log(`[DEBUG_LOG] Successfully deleted large document`);
+
+    // Verify document was deleted
+    const deletedDocument = await runInDurableObject(
+      stub,
+      async (instance: SQLiteDurableObject) => {
+        const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+        try {
+          return await hyphalObject.execute('getDocument', { id: documentId });
+        } catch (error) {
+          return null;
+        }
+      }
+    );
+
+    expect(deletedDocument).toBeNull();
+  });
 });

@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { generateEmbedding } from './embed';
+import { chunkDocument, checkTokenLimit } from './chunker';
 
 export interface PutVectorInput {
 	/** Optional UUID; server autogenerates if omitted */
@@ -124,7 +125,9 @@ function createTable(sql: SqlStorage) {
 				id TEXT PRIMARY KEY,			 -- Use UUID as TEXT
 				namespace TEXT,
 				vectors BLOB NOT NULL,
-				content TEXT
+				content TEXT,
+				parent_id TEXT,                  -- ID of parent document for chunks
+				is_chunk INTEGER DEFAULT 0       -- 1 if this is a chunk of a larger document
 			);
 		`);
 }
@@ -135,16 +138,20 @@ type InsertVectorArgs = {
 	namespace: string;
 	blob: Buffer;
 	content: string;
+	parent_id?: string;
+	is_chunk?: number;
 };
 function insertVector(args: InsertVectorArgs) {
-	const { sql, id, namespace, blob, content } = args;
+	const { sql, id, namespace, blob, content, parent_id = null, is_chunk = 0 } = args;
 	return sql.exec(
 		`INSERT
-		OR REPLACE INTO vectors (id, namespace, vectors, content) VALUES (?, ?, ?, ?)`,
+		OR REPLACE INTO vectors (id, namespace, vectors, content, parent_id, is_chunk) VALUES (?, ?, ?, ?, ?, ?)`,
 		id,
 		namespace,
 		blob,
-		content
+		content,
+		parent_id,
+		is_chunk
 	);
 }
 type GetVectorArgs = { sql: SqlStorage; id: string };
@@ -192,7 +199,7 @@ function getAllVectors(sql: SqlStorage) {
 
 function getVectorsByNamespace(sql: SqlStorage, namespace: string) {
 	return sql.exec(
-		`SELECT id, namespace, vectors, content
+		`SELECT id, namespace, vectors, content, parent_id, is_chunk
 		 FROM vectors
 		 WHERE namespace = ?`,
 		namespace
@@ -356,24 +363,65 @@ export class HyphalObject {
 					id = uuidv4();
 				}
 
-				// Generate embedding for the document content
-				console.log('DEBUG: Generating embeddings for content:', content);
-				const vector = await HyphalObject.embed(content);
-				console.log('DEBUG: Generated vector with length:', vector.length);
-				const blob = Buffer.from(this.encodeVectorToBlob(vector));
-				console.log('DEBUG: Generated blob with size:', blob.length, 'bytes, type:', blob.constructor.name);
+				// Check if the document exceeds the token limit (8000 tokens)
+				const TOKEN_LIMIT = 8000;
+				const tokenCount = checkTokenLimit(content, TOKEN_LIMIT);
 
+				// If the document is within the token limit, store it as a single vector
+				if (tokenCount !== false) {
+					// Generate embedding for the document content
+					const vector = await HyphalObject.embed(content);
+					const blob = Buffer.from(this.encodeVectorToBlob(vector));
 
-				// Store the document as a vector
-				insertVector({
-					id,
-					namespace,
-					blob,
-					content,
-					sql: this.sql,
-				});
+					// Store the document as a vector
+					insertVector({
+						id,
+						namespace,
+						blob,
+						content,
+						sql: this.sql,
+					});
 
-				return { id };
+					return { id };
+				} else {
+					// Chunk the document
+					const chunks = chunkDocument(content, {
+						chunkSize: Math.floor(TOKEN_LIMIT * 0.8), // 80% of token limit for safety
+						overlap: Math.floor(TOKEN_LIMIT * 0.1),   // 10% overlap
+					});
+
+					// Store metadata about the full document
+					insertVector({
+						id,
+						namespace,
+						blob: Buffer.from(new Uint8Array(0)), // Empty vector for the parent
+						content,                              // Store the full content in the parent
+						sql: this.sql,
+						is_chunk: 0                           // This is the parent document
+					});
+
+					// Store each chunk with a reference to the parent document
+					for (const chunk of chunks) {
+						const chunkId = uuidv4();
+
+						// Generate embedding for the chunk content
+						const vector = await HyphalObject.embed(chunk.text);
+						const blob = Buffer.from(this.encodeVectorToBlob(vector));
+
+						// Store the chunk as a vector with reference to parent
+						insertVector({
+							id: chunkId,
+							namespace,
+							blob,
+							content: chunk.text,
+							parent_id: id,
+							is_chunk: 1,
+							sql: this.sql,
+						});
+					}
+
+					return { id };
+				}
 			}
 
 			case 'getDocument': {
@@ -398,6 +446,9 @@ export class HyphalObject {
 					throw 'Document data is corrupted or missing';
 				}
 
+				// Note: For chunked documents, is_chunk will be 0 for parent documents
+				// and the vectors field will be empty (byteLength === 0)
+
 				return <DocumentResponse>{
 					id: row.id,
 					namespace: row.namespace,
@@ -411,17 +462,22 @@ export class HyphalObject {
 				// Generate embedding for the search query
 				const queryVector = await HyphalObject.embed(query);
 
-				// console.log(JSON.stringify({ queryVector }));
-
+				// Get all vectors in the namespace
 				const rows = getVectorsByNamespace(this.sql, namespace);
 
-
-				// console.log(JSON.stringify({ rows }));
+				// Score all rows based on similarity to the query
 				const scoredRows = await this.scoreRows(rows, queryVector);
 
+				// Process results to handle chunked documents
+				const processedResults = await this.processSearchResults(scoredRows);
+
+				// Sort by score (highest first)
+				const sortedResults = processedResults.sort((a, b) => b.score - a.score);
+
+				// Return top N results
 				const topResults = topN
-					? scoredRows.slice(0, topN)
-					: scoredRows;
+					? sortedResults.slice(0, topN)
+					: sortedResults;
 
 				return topResults;
 			}
@@ -430,12 +486,37 @@ export class HyphalObject {
 				const { ids } = payload as DeletePayload;
 
 				try {
-					bulkDeleteVectors({
-						ids,
-						sql: this.sql,
-					});
+					// For each document ID
+					for (const id of ids) {
+						// First, find and delete all chunks associated with this document
+						const chunksCursor = this.sql.exec(
+							`SELECT id FROM vectors WHERE parent_id = ?`,
+							[id]
+						);
+
+						const chunkIds = [];
+						for (const row of chunksCursor) {
+							chunkIds.push(row.id);
+						}
+
+						// Delete all chunks associated with this document
+						if (chunkIds.length > 0) {
+							bulkDeleteVectors({
+								ids: chunkIds,
+								sql: this.sql,
+							});
+						}
+
+						// Then delete the document itself
+						deleteVector({
+							id,
+							sql: this.sql,
+						});
+					}
+
 					return { message: 'Delete Succeeded' };
 				} catch (error) {
+					console.error('Error deleting document:', error);
 					return { message: 'Delete Failed' };
 				}
 			}
@@ -458,20 +539,70 @@ export class HyphalObject {
 		return rowsArray
 			.map(row => ({
 				row,
-				vectors: HyphalObject.decodeRowToVector(row),
+				vectors: row.vectors && row.vectors.byteLength > 0 ? HyphalObject.decodeRowToVector(row) : [],
 			}))
 			.map(({ row, vectors }) => {
 				return {
 					id: row.id,
 					namespace: row.namespace,
 					content: row.content,
-					score: HyphalObject.cosineSimilarity(
+					parent_id: row.parent_id,
+					is_chunk: row.is_chunk,
+					score: vectors.length > 0 ? HyphalObject.cosineSimilarity(
 						embeddedQuery,
 						vectors
-					),
+					) : 0,
 				};
 			})
 			.sort(this.sort);
+	}
+
+	/**
+	 * Process search results to handle chunked documents
+	 * @param scoredRows The scored rows from the search
+	 * @returns Processed search results with parent documents for chunks
+	 */
+	private async processSearchResults(scoredRows: SearchResponse): Promise<SearchResponse> {
+		// Map to store the highest score for each document ID
+		const documentScores = new Map<string, number>();
+		// Map to store the document data for each ID
+		const documentData = new Map<string, ScoredRow>();
+
+		// Process each row
+		for (const row of scoredRows) {
+			// Skip rows with zero score (like parent documents with empty vectors)
+			if (row.score === 0) continue;
+
+			// If this is a chunk, we need to get its parent document
+			if (row.is_chunk === 1 && row.parent_id) {
+				const parentId = row.parent_id;
+
+				// If we haven't seen this parent before, or this chunk has a higher score
+				if (!documentScores.has(parentId) || row.score > documentScores.get(parentId)!) {
+					// Get the parent document
+					try {
+						const parentDoc = await this.execute('getDocument', { id: parentId }) as DocumentResponse;
+
+						// Store the parent document with the chunk's score
+						documentScores.set(parentId, row.score);
+						documentData.set(parentId, {
+							id: parentId,
+							namespace: parentDoc.namespace,
+							content: parentDoc.content,
+							score: row.score
+						});
+					} catch (error) {
+						console.error(`Error retrieving parent document ${parentId}:`, error);
+					}
+				}
+			} else {
+				// This is a regular document, store it directly
+				documentScores.set(row.id, row.score);
+				documentData.set(row.id, row);
+			}
+		}
+
+		return Array.from(documentData.values());
 	}
 
 	/**
@@ -490,6 +621,8 @@ export class HyphalObject {
 			namespace: string;
 			blob: Buffer;
 			content: string;
+			parent_id?: string;
+			is_chunk?: number;
 		}>;
 	}) {
 		const { sql, vectors } = args;
@@ -498,11 +631,13 @@ export class HyphalObject {
 		// Durable Objects automatically coalesce writes into atomic transactions
 		for (const vector of vectors) {
 			sql.exec(
-				`INSERT OR REPLACE INTO vectors (id, namespace, vectors, content) VALUES (?, ?, ?, ?)`,
+				`INSERT OR REPLACE INTO vectors (id, namespace, vectors, content, parent_id, is_chunk) VALUES (?, ?, ?, ?, ?, ?)`,
 				vector.id,
 				vector.namespace,
 				vector.blob,
-				vector.content
+				vector.content,
+				vector.parent_id || null,
+				vector.is_chunk || 0
 			);
 		}
 	}
