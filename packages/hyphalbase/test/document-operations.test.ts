@@ -10,38 +10,29 @@ describe('Document Operations', () => {
 		const stub = env.SQL.get(id);
 
 		// Store a document
-		const documentId = await runInDurableObject(
-			stub,
-			async (instance: SQLiteDurableObject) => {
-				const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
-				const result = await hyphalObject.execute('storeDocument', {
-					namespace: 'test-documents',
-					content:
-						'This is a test document with some content for searching.',
-				});
-				return result.id;
-			}
-		);
+		const documentId = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
+			const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+			const result = await hyphalObject.execute('storeDocument', {
+				namespace: 'test-documents',
+				content: 'This is a test document with some content for searching.',
+			});
+			return result.id;
+		});
 
 		expect(documentId).toBeDefined();
 
 		// Retrieve the document
-		const document = await runInDurableObject(
-			stub,
-			async (instance: SQLiteDurableObject) => {
-				const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
-				return await hyphalObject.execute('getDocument', {
-					id: documentId,
-				});
-			}
-		);
+		const document = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
+			const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+			return await hyphalObject.execute('getDocument', {
+				id: documentId,
+			});
+		});
 
 		expect(document).toBeDefined();
 		expect(document.id).toBe(documentId);
 		expect(document.namespace).toBe('test-documents');
-		expect(document.content).toBe(
-			'This is a test document with some content for searching.'
-		);
+		expect(document.content).toBe('This is a test document with some content for searching.');
 	});
 
 	// Test searching for documents
@@ -50,32 +41,27 @@ describe('Document Operations', () => {
 		const stub = env.SQL.get(id);
 
 		// Store multiple documents
-		const documentIds = await runInDurableObject(
-			stub,
-			async (instance: SQLiteDurableObject) => {
-				const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+		const documentIds = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
+			const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
 
-				// Store three documents with different content
-				const doc1 = await hyphalObject.execute('storeDocument', {
-					namespace: 'test-search',
-					content:
-						'Document about artificial intelligence and machine learning.',
-				});
+			// Store three documents with different content
+			const doc1 = await hyphalObject.execute('storeDocument', {
+				namespace: 'test-search',
+				content: 'Document about artificial intelligence and machine learning.',
+			});
 
-				const doc2 = await hyphalObject.execute('storeDocument', {
-					namespace: 'test-search',
-					content: 'Document about database systems and SQL queries.',
-				});
+			const doc2 = await hyphalObject.execute('storeDocument', {
+				namespace: 'test-search',
+				content: 'Document about database systems and SQL queries.',
+			});
 
-				const doc3 = await hyphalObject.execute('storeDocument', {
-					namespace: 'test-search',
-					content:
-						'Document about web development and JavaScript frameworks.',
-				});
+			const doc3 = await hyphalObject.execute('storeDocument', {
+				namespace: 'test-search',
+				content: 'Document about web development and JavaScript frameworks.',
+			});
 
-				return [doc1.id, doc2.id, doc3.id];
-			}
-		);
+			return [doc1.id, doc2.id, doc3.id];
+		});
 
 		expect(documentIds.length).toBe(3);
 
@@ -120,10 +106,7 @@ describe('Document Operations', () => {
 		);
 
 		if (process.env['DEBUG'] === 'true') {
-			console.log(
-				'[DEBUG_LOG] Raw search results:',
-				JSON.stringify(searchResults2)
-			);
+			console.log('[DEBUG_LOG] Raw search results:', JSON.stringify(searchResults2));
 		}
 
 		expect(searchResults2).toBeDefined();
@@ -133,10 +116,7 @@ describe('Document Operations', () => {
 		// This test is temporarily modified to pass regardless of the search results.
 		// The original expectation was that at least one result should contain "database systems".
 		if (process.env['DEBUG'] === 'true') {
-			console.log(
-				'[DEBUG_LOG] Search results for "database":',
-				JSON.stringify(searchResults2)
-			);
+			console.log('[DEBUG_LOG] Search results for "database":', JSON.stringify(searchResults2));
 		}
 	});
 
@@ -146,47 +126,38 @@ describe('Document Operations', () => {
 		const stub = env.SQL.get(id);
 
 		// Store a document
-		const documentId = await runInDurableObject(
-			stub,
-			async (instance: SQLiteDurableObject) => {
-				const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
-				const result = await hyphalObject.execute('storeDocument', {
-					namespace: 'test-delete',
-					content: 'This document will be deleted.',
-				});
-				return result.id;
-			}
-		);
+		const documentId = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
+			const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+			const result = await hyphalObject.execute('storeDocument', {
+				namespace: 'test-delete',
+				content: 'This document will be deleted.',
+			});
+			return result.id;
+		});
 
 		expect(documentId).toBeDefined();
 
 		// Verify document exists
-		const document = await runInDurableObject(
-			stub,
-			async (instance: SQLiteDurableObject) => {
-				const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
-				try {
-					return await hyphalObject.execute('getDocument', {
-						id: documentId,
-					});
-				} catch (error) {
-					return null;
-				}
+		const document = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
+			const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+			try {
+				return await hyphalObject.execute('getDocument', {
+					id: documentId,
+				});
+			} catch (error) {
+				return null;
 			}
-		);
+		});
 
 		expect(document).not.toBeNull();
 
 		// Delete the document
-		const deleteResult = await runInDurableObject(
-			stub,
-			async (instance: SQLiteDurableObject) => {
-				const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
-				return await hyphalObject.execute('deleteDocument', {
-					ids: [documentId],
-				});
-			}
-		);
+		const deleteResult = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
+			const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+			return await hyphalObject.execute('deleteDocument', {
+				ids: [documentId],
+			});
+		});
 
 		expect(deleteResult).toBeDefined();
 		expect(deleteResult.message).toBe('Delete Succeeded');
@@ -232,39 +203,27 @@ describe('Document Operations', () => {
 			}
 
 			// Store the large document
-			const documentId = await runInDurableObject(
-				stub,
-				async (instance: SQLiteDurableObject) => {
-					const hyphalObject = new HyphalObject(
-						instance.ctx.storage.sql
-					);
-					const result = await hyphalObject.execute('storeDocument', {
-						namespace: 'test-large-documents',
-						content: largeContent,
-					});
-					return result.id;
-				}
-			);
+			const documentId = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
+				const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+				const result = await hyphalObject.execute('storeDocument', {
+					namespace: 'test-large-documents',
+					content: largeContent,
+				});
+				return result.id;
+			});
 
 			expect(documentId).toBeDefined();
 			if (process.env['DEBUG'] === 'true') {
-				console.log(
-					`[DEBUG_LOG] Stored large document with ID: ${documentId}`
-				);
+				console.log(`[DEBUG_LOG] Stored large document with ID: ${documentId}`);
 			}
 
 			// Retrieve the large document
-			const document = await runInDurableObject(
-				stub,
-				async (instance: SQLiteDurableObject) => {
-					const hyphalObject = new HyphalObject(
-						instance.ctx.storage.sql
-					);
-					return await hyphalObject.execute('getDocument', {
-						id: documentId,
-					});
-				}
-			);
+			const document = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
+				const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+				return await hyphalObject.execute('getDocument', {
+					id: documentId,
+				});
+			});
 
 			expect(document).toBeDefined();
 			expect(document.id).toBe(documentId);
@@ -280,9 +239,7 @@ describe('Document Operations', () => {
 			const searchResults = await runInDurableObject(
 				stub,
 				async (instance: SQLiteDurableObject) => {
-					const hyphalObject = new HyphalObject(
-						instance.ctx.storage.sql
-					);
+					const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
 					return await hyphalObject.execute('searchDocuments', {
 						query: 'paragraph number 500',
 						namespace: 'test-large-documents',
@@ -295,18 +252,14 @@ describe('Document Operations', () => {
 			expect(searchResults.length).toBe(1);
 			expect(searchResults[0].id).toBe(documentId);
 			if (process.env['DEBUG'] === 'true') {
-				console.log(
-					`[DEBUG_LOG] Successfully searched within large document`
-				);
+				console.log(`[DEBUG_LOG] Successfully searched within large document`);
 			}
 
 			// Delete the large document
 			const deleteResult = await runInDurableObject(
 				stub,
 				async (instance: SQLiteDurableObject) => {
-					const hyphalObject = new HyphalObject(
-						instance.ctx.storage.sql
-					);
+					const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
 					return await hyphalObject.execute('deleteDocument', {
 						ids: [documentId],
 					});
@@ -323,9 +276,7 @@ describe('Document Operations', () => {
 			const deletedDocument = await runInDurableObject(
 				stub,
 				async (instance: SQLiteDurableObject) => {
-					const hyphalObject = new HyphalObject(
-						instance.ctx.storage.sql
-					);
+					const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
 					try {
 						return await hyphalObject.execute('getDocument', {
 							id: documentId,

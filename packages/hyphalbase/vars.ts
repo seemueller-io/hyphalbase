@@ -9,10 +9,8 @@ const defaults = {
 };
 
 const OPENAI_API_KEY = process.env['OPENAI_API_KEY'] ?? defaults.openaiApiKey;
-const OPENAI_API_ENDPOINT =
-	process.env['OPENAI_API_ENDPOINT'] ?? defaults.openaiEndpoint;
-const EMBEDDINGS_MODEL =
-	process.env['EMBEDDINGS_MODEL'] ?? defaults.embeddingsModel;
+const OPENAI_API_ENDPOINT = process.env['OPENAI_API_ENDPOINT'] ?? defaults.openaiEndpoint;
+const EMBEDDINGS_MODEL = process.env['EMBEDDINGS_MODEL'] ?? defaults.embeddingsModel;
 // Enable debug logging only if DEBUG environment variable is set to 'true'
 const DEBUG = process.env['DEBUG'] === 'true' || defaults.debug;
 

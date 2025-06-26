@@ -1,10 +1,5 @@
 import { GraphQLClient } from 'graphql-request';
-import {
-	GET_VECTOR,
-	SEARCH_VECTORS,
-	PUT_VECTOR,
-	DELETE_VECTOR,
-} from './operations/vectors';
+import { GET_VECTOR, SEARCH_VECTORS, PUT_VECTOR, DELETE_VECTOR } from './operations/vectors';
 import {
 	GET_DOCUMENT,
 	SEARCH_DOCUMENTS,
@@ -40,12 +35,7 @@ export class HyphalbaseClient {
 	/**
 	 * Put a vector
 	 */
-	async putVector(input: {
-		id?: string;
-		namespace: string;
-		content: string;
-		vector: number[];
-	}) {
+	async putVector(input: { id?: string; namespace: string; content: string; vector: number[] }) {
 		return this.client.request(PUT_VECTOR, { input });
 	}
 
@@ -88,11 +78,7 @@ export class HyphalbaseClient {
 	/**
 	 * Store a document
 	 */
-	async storeDocument(input: {
-		id?: string;
-		namespace: string;
-		content: string;
-	}) {
+	async storeDocument(input: { id?: string; namespace: string; content: string }) {
 		return this.client.request(STORE_DOCUMENT, { input });
 	}
 

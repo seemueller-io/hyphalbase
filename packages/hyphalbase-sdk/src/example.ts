@@ -3,9 +3,7 @@ import { HyphalbaseClient } from './index';
 // This is an example of how to use the client
 async function main() {
 	// Create a client
-	const client = new HyphalbaseClient(
-		'https://your-hyphalbase-endpoint.com/graphql'
-	);
+	const client = new HyphalbaseClient('https://your-hyphalbase-endpoint.com/graphql');
 
 	try {
 		// Example: Get a vector

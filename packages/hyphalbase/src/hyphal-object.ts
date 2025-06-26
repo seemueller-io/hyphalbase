@@ -145,15 +145,7 @@ type InsertVectorArgs = {
 	is_chunk?: number;
 };
 function insertVector(args: InsertVectorArgs) {
-	const {
-		sql,
-		id,
-		namespace,
-		blob,
-		content,
-		parent_id = null,
-		is_chunk = 0,
-	} = args;
+	const { sql, id, namespace, blob, content, parent_id = null, is_chunk = 0 } = args;
 	return sql.exec(
 		`INSERT
 		OR REPLACE INTO vectors (id, namespace, vectors, content, parent_id, is_chunk) VALUES (?, ?, ?, ?, ?, ?)`,
@@ -329,9 +321,7 @@ export class HyphalObject {
 
 				const scoredRows = await this.scoreRows(rows, query);
 
-				const topResults = topN
-					? scoredRows.slice(0, topN)
-					: scoredRows;
+				const topResults = topN ? scoredRows.slice(0, topN) : scoredRows;
 
 				return topResults;
 			}
@@ -342,9 +332,7 @@ export class HyphalObject {
 				// Process each vector to ensure it has an ID and convert to the format expected by bulkInsertVectors
 				const processedVectors = vectors.map(vector => {
 					const id = vector.id || uuidv4();
-					const blob = Buffer.from(
-						this.encodeVectorToBlob(vector.vector)
-					);
+					const blob = Buffer.from(this.encodeVectorToBlob(vector.vector));
 
 					return {
 						id,
@@ -370,8 +358,7 @@ export class HyphalObject {
 			}
 
 			case 'storeDocument': {
-				let { id, namespace, content } =
-					payload as StoreDocumentPayload;
+				let { id, namespace, content } = payload as StoreDocumentPayload;
 
 				if (!id) {
 					id = uuidv4();
@@ -420,9 +407,7 @@ export class HyphalObject {
 
 						// Generate embedding for the chunk content
 						const vector = await HyphalObject.embed(chunk.text);
-						const blob = Buffer.from(
-							this.encodeVectorToBlob(vector)
-						);
+						const blob = Buffer.from(this.encodeVectorToBlob(vector));
 
 						// Store the chunk as a vector with reference to parent
 						insertVector({
@@ -473,8 +458,7 @@ export class HyphalObject {
 			}
 
 			case 'searchDocuments': {
-				const { query, namespace, topN } =
-					payload as SearchDocumentsPayload;
+				const { query, namespace, topN } = payload as SearchDocumentsPayload;
 
 				// Generate embedding for the search query
 				const queryVector = await HyphalObject.embed(query);
@@ -486,18 +470,13 @@ export class HyphalObject {
 				const scoredRows = await this.scoreRows(rows, queryVector);
 
 				// Process results to handle chunked documents
-				const processedResults =
-					await this.processSearchResults(scoredRows);
+				const processedResults = await this.processSearchResults(scoredRows);
 
 				// Sort by score (highest first)
-				const sortedResults = processedResults.sort(
-					(a, b) => b.score - a.score
-				);
+				const sortedResults = processedResults.sort((a, b) => b.score - a.score);
 
 				// Return top N results
-				const topResults = topN
-					? sortedResults.slice(0, topN)
-					: sortedResults;
+				const topResults = topN ? sortedResults.slice(0, topN) : sortedResults;
 
 				return topResults;
 			}
@@ -509,10 +488,9 @@ export class HyphalObject {
 					// For each document ID
 					for (const id of ids) {
 						// First, find and delete all chunks associated with this document
-						const chunksCursor = this.sql.exec(
-							`SELECT id FROM vectors WHERE parent_id = ?`,
-							[id]
-						);
+						const chunksCursor = this.sql.exec(`SELECT id FROM vectors WHERE parent_id = ?`, [
+							id,
+						]);
 
 						const chunkIds = [];
 						for (const row of chunksCursor) {
@@ -560,9 +538,7 @@ export class HyphalObject {
 			.map(row => ({
 				row,
 				vectors:
-					row.vectors && row.vectors.byteLength > 0
-						? HyphalObject.decodeRowToVector(row)
-						: [],
+					row.vectors && row.vectors.byteLength > 0 ? HyphalObject.decodeRowToVector(row) : [],
 			}))
 			.map(({ row, vectors }) => {
 				return {
@@ -571,13 +547,7 @@ export class HyphalObject {
 					content: row.content,
 					parent_id: row.parent_id,
 					is_chunk: row.is_chunk,
-					score:
-						vectors.length > 0
-							? HyphalObject.cosineSimilarity(
-									embeddedQuery,
-									vectors
-								)
-							: 0,
+					score: vectors.length > 0 ? HyphalObject.cosineSimilarity(embeddedQuery, vectors) : 0,
 				};
 			})
 			.sort(this.sort);
@@ -588,9 +558,7 @@ export class HyphalObject {
 	 * @param scoredRows The scored rows from the search
 	 * @returns Processed search results with parent documents for chunks
 	 */
-	private async processSearchResults(
-		scoredRows: SearchResponse
-	): Promise<SearchResponse> {
+	private async processSearchResults(scoredRows: SearchResponse): Promise<SearchResponse> {
 		// Map to store the highest score for each document ID
 		const documentScores = new Map<string, number>();
 		// Map to store the document data for each ID
@@ -606,10 +574,7 @@ export class HyphalObject {
 				const parentId = row.parent_id;
 
 				// If we haven't seen this parent before, or this chunk has a higher score
-				if (
-					!documentScores.has(parentId) ||
-					row.score > documentScores.get(parentId)!
-				) {
+				if (!documentScores.has(parentId) || row.score > documentScores.get(parentId)!) {
 					// Get the parent document
 					try {
 						const parentDoc = (await this.execute('getDocument', {
@@ -625,10 +590,7 @@ export class HyphalObject {
 							score: row.score,
 						});
 					} catch (error) {
-						console.error(
-							`Error retrieving parent document ${parentId}:`,
-							error
-						);
+						console.error(`Error retrieving parent document ${parentId}:`, error);
 					}
 				}
 			} else {
@@ -679,9 +641,7 @@ export class HyphalObject {
 	}
 
 	encodeVectorToBlob(vector: number[]): Uint8Array {
-		const buffer = new ArrayBuffer(
-			vector.length * Float32Array.BYTES_PER_ELEMENT
-		);
+		const buffer = new ArrayBuffer(vector.length * Float32Array.BYTES_PER_ELEMENT);
 		const view = new Float32Array(buffer);
 		for (let i = 0; i < vector.length; i++) {
 			view[i] = vector[i];
@@ -698,10 +658,7 @@ export class HyphalObject {
 			throw new TypeError('Invalid blob data for decoding.');
 		}
 
-		const buffer = blob.buffer.slice(
-			blob.byteOffset,
-			blob.byteOffset + blob.byteLength
-		);
+		const buffer = blob.buffer.slice(blob.byteOffset, blob.byteOffset + blob.byteLength);
 		const view = new Float32Array(buffer);
 		return Array.from(view);
 	}

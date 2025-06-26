@@ -43,8 +43,7 @@ function* _chunkIterator(
 			const candidates = slice.match(boundaryRegex) ?? [];
 			const lastHitPos = slice.lastIndexOf(candidates.pop() ?? '');
 			if (lastHitPos > -1 && lastHitPos > slice.length * 0.5) {
-				endTok =
-					startTok + encode(slice.slice(0, lastHitPos + 1)).length;
+				endTok = startTok + encode(slice.slice(0, lastHitPos + 1)).length;
 			}
 		}
 
@@ -69,9 +68,7 @@ export function chunkDocument(
 	input: string | { content: string }[],
 	opts: ChunkOpts = {}
 ): Chunk[] {
-	const raw = Array.isArray(input)
-		? input.map(o => o.content).join(' ')
-		: input;
+	const raw = Array.isArray(input) ? input.map(o => o.content).join(' ') : input;
 	const { chunkSize = 768, overlap = 115, boundaryRegex = /[.\n]/ } = opts;
 	return [..._chunkIterator(raw, { chunkSize, overlap, boundaryRegex })];
 }
@@ -83,9 +80,7 @@ export function chunkDocumentGenerator(
 	input: string | { content: string }[],
 	opts: ChunkOpts = {}
 ): Generator<Chunk, void, unknown> {
-	const raw = Array.isArray(input)
-		? input.map(o => o.content).join(' ')
-		: input;
+	const raw = Array.isArray(input) ? input.map(o => o.content).join(' ') : input;
 	const { chunkSize = 768, overlap = 115, boundaryRegex = /[.\n]/ } = opts;
 	return _chunkIterator(raw, { chunkSize, overlap, boundaryRegex });
 }

@@ -1,46 +1,46 @@
 name: Build
 
 on:
-    push:
-        branches: ["main"]
-    pull_request:
-        branches: ["main"]
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
 
 jobs:
-    build:
-        runs-on: ubuntu-22.04
-        strategy:
-            matrix:
-                node-version: [20]
-        steps:
-            - uses: actions/checkout@v4
-            - name: Install pnpm
-              uses: pnpm/action-setup@v4
-            - name: Use Node.js ${{ matrix.node-version }}
-              uses: actions/setup-node@v4
-              with:
-                  node-version: ${{ matrix.node-version }}
-                  cache: "pnpm"
-            - name: Install dependencies
-              run: pnpm install
+  build:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        node-version: [20]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "pnpm"
+      - name: Install dependencies
+        run: pnpm install
 
-            - name: Setup Rust
-              uses: actions-rs/toolchain@v1
-              with:
-                  toolchain: stable
-                  override: true
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
 
-            - name: Build embeddings-server
-              run: cargo build --package embeddings-server
+      - name: Build embeddings-server
+        run: cargo build --package embeddings-server
 
-            - name: Start embeddings-server in background
-              run: |
-                  cd target/debug
-                  ./embeddings-server &
-                  echo "Waiting for embeddings-server to start..."
-                  sleep 5  # Give the server time to start
+      - name: Start embeddings-server in background
+        run: |
+          cd target/debug
+          ./embeddings-server &
+          echo "Waiting for embeddings-server to start..."
+          sleep 5  # Give the server time to start
 
-            - name: Run tests
-              run: pnpm test
-              env:
-                  OPENAI_API_ENDPOINT: "http://localhost:8080/v1"
+      - name: Run tests
+        run: pnpm test
+        env:
+          OPENAI_API_ENDPOINT: "http://localhost:8080/v1"
