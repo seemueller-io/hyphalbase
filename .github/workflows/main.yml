@@ -24,5 +24,23 @@ jobs:
             - name: Install dependencies
               run: pnpm install
 
-            - name: Install dependencies
+            - name: Setup Rust
+              uses: actions-rs/toolchain@v1
+              with:
+                toolchain: stable
+                override: true
+
+            - name: Build embeddings-server
+              run: cargo build --package embeddings-server
+
+            - name: Start embeddings-server in background
+              run: |
+                cd target/debug
+                ./embeddings-server &
+                echo "Waiting for embeddings-server to start..."
+                sleep 5  # Give the server time to start
+
+            - name: Run tests
               run: pnpm test
+              env:
+                OPENAI_API_ENDPOINT: "http://localhost:8080/v1"
