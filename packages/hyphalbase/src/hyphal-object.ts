@@ -52,12 +52,21 @@ interface PutPayload extends PutVectorInput {
 	vector: number[];
 }
 
+interface BulkPutPayload {
+	vectors: Array<{
+		id?: string;
+		namespace: string;
+		vector: number[];
+		content: string;
+	}>;
+}
+
 interface GetPayload {
 	id: string;
 }
 
 interface DeletePayload {
-	id: string;
+	ids: string[];
 }
 
 interface SearchPayload {
@@ -73,6 +82,7 @@ type DeleteAllPayload = Record<string, never>; // no payload
  */
 interface OperationMap {
 	put: { payload: PutPayload; response: PutVectorResponse };
+	bulkPut: { payload: BulkPutPayload; response: OkMessage };
 	get: { payload: GetPayload; response: GetVectorResponse };
 	embed: { payload: EmbedPayload; response: EmbedResponse };
 	delete: { payload: DeletePayload; response: OkMessage };
@@ -129,6 +139,20 @@ function deleteVector(args: DeleteVectorArgs) {
 									 WHERE id = ?`,
 		[id]
 	);
+}
+
+type BulkDeleteVectorsArgs = { sql: SqlStorage; ids: string[] };
+function bulkDeleteVectors(args: BulkDeleteVectorsArgs) {
+	const { sql, ids } = args;
+
+	// Delete each vector individually
+	// Durable Objects automatically coalesce writes into atomic transactions
+	for (const id of ids) {
+		deleteVector({
+			id,
+			sql
+		});
+	}
 }
 
 function getAllVectors(sql: SqlStorage) {
@@ -220,11 +244,11 @@ export class HyphalObject {
 			}
 
 			case 'delete': {
-				const { id } = payload as DeletePayload;
+				const { ids } = payload as DeletePayload;
 
 				try {
-					deleteVector({
-						id,
+					bulkDeleteVectors({
+						ids,
 						sql: this.sql,
 					});
 					return { message: 'Delete Succeeded' };
@@ -257,6 +281,31 @@ export class HyphalObject {
 				return topResults;
 			}
 
+			case 'bulkPut': {
+				const { vectors } = payload as BulkPutPayload;
+
+				// Process each vector to ensure it has an ID and convert to the format expected by bulkInsertVectors
+				const processedVectors = vectors.map(vector => {
+					const id = vector.id || uuidv4();
+					const blob = Buffer.from(this.encodeVectorToBlob(vector.vector));
+
+					return {
+						id,
+						namespace: vector.namespace,
+						blob,
+						content: vector.content
+					};
+				});
+
+				// Insert all vectors in a single transaction
+				this.bulkInsertVectors({
+					sql: this.sql,
+					vectors: processedVectors
+				});
+
+				return { message: 'Bulk insert succeeded' };
+			}
+
 			case 'deleteAll': {
 				deleteAllVectors(this.sql);
 
@@ -272,8 +321,13 @@ export class HyphalObject {
 		rows: SqlStorageCursor<Record<string, SqlStorageValue>>,
 		embeddedQuery: number[]
 	): Promise<SearchResponse> {
-		return rows
-		// @ts-ignore - map is valid
+		// Convert cursor to array
+		const rowsArray = [];
+		for (const row of rows) {
+			rowsArray.push(row);
+		}
+
+		return rowsArray
 			.map(row => ({
 				row,
 				vectors: HyphalObject.decodeRowToVector(row),
@@ -295,6 +349,31 @@ export class HyphalObject {
 	private sort(prev: { score: number }, next: { score: number }) {
 		return prev.score - next.score;
 	}
+
+	private bulkInsertVectors(args: {
+		sql: SqlStorage;
+		vectors: Array<{
+			id: string;
+			namespace: string;
+			blob: Buffer;
+			content: string;
+		}>;
+	}) {
+		const { sql, vectors } = args;
+
+		// Insert each vector individually
+		// Durable Objects automatically coalesce writes into atomic transactions
+		for (const vector of vectors) {
+			sql.exec(
+				`INSERT OR REPLACE INTO vectors (id, namespace, vectors, content) VALUES (?, ?, ?, ?)`,
+				vector.id,
+				vector.namespace,
+				vector.blob,
+				vector.content
+			);
+		}
+	}
+
 
 	encodeVectorToBlob(vector: number[]): Uint8Array {
 		const buffer = new ArrayBuffer(

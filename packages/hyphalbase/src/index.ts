@@ -1,4 +1,4 @@
-import { HyphalObject } from './hyphal_object';
+import { HyphalObject } from './hyphal-object';
 import { createYoga, createSchema } from 'graphql-yoga';
 import Schema from './gql-schema';
 export class SQLiteDurableObject implements DurableObject {

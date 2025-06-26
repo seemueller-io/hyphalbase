@@ -1,5 +1,5 @@
 import GqlSchema from './src/gql-schema';
-import { HyphalObject } from './src/hyphal_object';
+import { HyphalObject } from './src/hyphal-object';
 import { createSchema } from 'graphql-yoga';
 import { printSchema } from 'graphql';
 import { writeFileSync } from 'node:fs';

@@ -1,4 +1,4 @@
-import { HyphalObject } from './hyphal_object';
+import { HyphalObject } from './hyphal-object';
 
 const schema = (outer: any & { hyphal_object?: HyphalObject }) => ({
 	typeDefs: /* GraphQL */ `
@@ -10,7 +10,7 @@ const schema = (outer: any & { hyphal_object?: HyphalObject }) => ({
 
 		type Mutation {
 			putVector(input: PutVectorInput!): PutVectorResponse!
-			deleteVector(id: String!): OkMessage!
+			deleteVector(ids: [String!]!): OkMessage!
 			deleteAllVectors: OkMessage!
 		}
 
@@ -76,8 +76,8 @@ const schema = (outer: any & { hyphal_object?: HyphalObject }) => ({
 					vector,
 				});
 			},
-			deleteVector: async (_, { id }) => {
-				return await outer.hyphal_object.execute('delete', { id });
+			deleteVector: async (_, { ids }) => {
+				return await outer.hyphal_object.execute('delete', { ids });
 			},
 			deleteAllVectors: async () => {
 				return await outer.hyphal_object.execute('deleteAll', {});
