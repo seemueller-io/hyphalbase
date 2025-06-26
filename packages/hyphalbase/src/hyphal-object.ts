@@ -20,6 +20,18 @@ export interface GetVectorResponse {
 	content: string;
 }
 
+// Document response
+export interface DocumentResponse {
+	id: string;
+	namespace: string;
+	content: string;
+}
+
+// Store document response
+export interface StoreDocumentResponse {
+	id: string;
+}
+
 // "Get" response (same for single-vector fetch)
 export interface EmbedResponse {
 	embeddings: number[];
@@ -52,6 +64,12 @@ interface PutPayload extends PutVectorInput {
 	vector: number[];
 }
 
+interface StoreDocumentPayload {
+	id?: string;
+	namespace: string;
+	content: string;
+}
+
 interface BulkPutPayload {
 	vectors: Array<{
 		id?: string;
@@ -74,6 +92,12 @@ interface SearchPayload {
 	topN?: number;
 }
 
+interface SearchDocumentsPayload {
+	query: string;
+	namespace: string;
+	topN?: number;
+}
+
 type DeleteAllPayload = Record<string, never>; // no payload
 
 /**
@@ -88,6 +112,10 @@ interface OperationMap {
 	delete: { payload: DeletePayload; response: OkMessage };
 	search: { payload: SearchPayload; response: ScoredRow[] };
 	deleteAll: { payload: DeleteAllPayload; response: OkMessage };
+	storeDocument: { payload: StoreDocumentPayload; response: StoreDocumentResponse };
+	getDocument: { payload: GetPayload; response: DocumentResponse };
+	searchDocuments: { payload: SearchDocumentsPayload; response: ScoredRow[] };
+	deleteDocument: { payload: DeletePayload; response: OkMessage };
 }
 
 function createTable(sql: SqlStorage) {
@@ -159,6 +187,15 @@ function getAllVectors(sql: SqlStorage) {
 	return sql.exec(
 		`SELECT id, namespace, vectors, content
 		 FROM vectors`
+	);
+}
+
+function getVectorsByNamespace(sql: SqlStorage, namespace: string) {
+	return sql.exec(
+		`SELECT id, namespace, vectors, content
+		 FROM vectors
+		 WHERE namespace = ?`,
+		namespace
 	);
 }
 
@@ -312,6 +349,97 @@ export class HyphalObject {
 				return { message: 'All vectors deleted successfully' };
 			}
 
+			case 'storeDocument': {
+				let { id, namespace, content } = payload as StoreDocumentPayload;
+
+				if (!id) {
+					id = uuidv4();
+				}
+
+				// Generate embedding for the document content
+				console.log('DEBUG: Generating embeddings for content:', content);
+				const vector = await HyphalObject.embed(content);
+				console.log('DEBUG: Generated vector with length:', vector.length);
+				const blob = Buffer.from(this.encodeVectorToBlob(vector));
+				console.log('DEBUG: Generated blob with size:', blob.length, 'bytes, type:', blob.constructor.name);
+
+
+				// Store the document as a vector
+				insertVector({
+					id,
+					namespace,
+					blob,
+					content,
+					sql: this.sql,
+				});
+
+				return { id };
+			}
+
+			case 'getDocument': {
+				const { id } = payload as GetPayload;
+
+				const cursor = getVector({
+					id: id,
+					sql: this.sql,
+				});
+
+				const results = [];
+				for (const row of cursor) {
+					results.push(row);
+				}
+
+				if (results.length === 0) {
+					throw 'Document not found';
+				}
+
+				const row = results[0];
+				if (!row) {
+					throw 'Document data is corrupted or missing';
+				}
+
+				return <DocumentResponse>{
+					id: row.id,
+					namespace: row.namespace,
+					content: row.content,
+				};
+			}
+
+			case 'searchDocuments': {
+				const { query, namespace, topN } = payload as SearchDocumentsPayload;
+
+				// Generate embedding for the search query
+				const queryVector = await HyphalObject.embed(query);
+
+				// console.log(JSON.stringify({ queryVector }));
+
+				const rows = getVectorsByNamespace(this.sql, namespace);
+
+
+				// console.log(JSON.stringify({ rows }));
+				const scoredRows = await this.scoreRows(rows, queryVector);
+
+				const topResults = topN
+					? scoredRows.slice(0, topN)
+					: scoredRows;
+
+				return topResults;
+			}
+
+			case 'deleteDocument': {
+				const { ids } = payload as DeletePayload;
+
+				try {
+					bulkDeleteVectors({
+						ids,
+						sql: this.sql,
+					});
+					return { message: 'Delete Succeeded' };
+				} catch (error) {
+					return { message: 'Delete Failed' };
+				}
+			}
+
 			default:
 				return { message: 'Invalid operation' };
 		}
@@ -346,8 +474,13 @@ export class HyphalObject {
 			.sort(this.sort);
 	}
 
+	/**
+	 * Comparison function used for sorting search results by similarity scores.
+	 * Returns positive values when the next score is higher than the previous score,
+	 * which sorts results in descending order (highest scores first).
+	 */
 	private sort(prev: { score: number }, next: { score: number }) {
-		return prev.score - next.score;
+		return next.score - prev.score;
 	}
 
 	private bulkInsertVectors(args: {
