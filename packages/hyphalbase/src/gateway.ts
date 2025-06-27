@@ -1,5 +1,15 @@
 import { v4 as uuidv4 } from 'uuid';
 
+import {
+  generateEncryptionKey,
+  exportKey,
+  importKey,
+  encryptApiKey,
+  decryptApiKey,
+  generateApiKey,
+} from './secure-api-key-encryption';
+import { verifyPasswordWithPBKDF2, hashPasswordWithPBKDF2 } from './secure-password-hashing';
+
 export interface CreateUser {
   /** Optional UUID; server autogenerates if omitted */
   username: string;
@@ -59,7 +69,8 @@ function createUsersTable(sql: SqlStorage) {
           id           TEXT PRIMARY KEY,              -- UUIDv4
           username     TEXT UNIQUE NOT NULL,
           password_hash TEXT NOT NULL,                -- *never* store raw passwords
-          user_data     TEXT -- arbitrary place to put metadata about the user,
+          password_salt BLOB,                         -- salt for PBKDF2 hashing
+          user_data     TEXT, -- arbitrary place to put metadata about the user,
           created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
 			);
 		`);
@@ -84,28 +95,30 @@ type CreateUserArgs = {
   id: string;
   username: string;
   password_hash: string;
+  password_salt: Uint8Array;
   user_data: string;
 };
 
 async function createUser(args: CreateUserArgs) {
-  const { sql, id, username, password_hash, user_data } = args;
+  const { sql, id, username, password_hash, password_salt, user_data } = args;
   return sql.exec(
-    `INSERT INTO users (id, username, password_hash, user_data)
-     VALUES (?, ?, ?, ?)`,
+    `INSERT INTO users (id, username, password_hash, password_salt, user_data)
+     VALUES (?, ?, ?, ?, ?)`,
     id,
     username,
     password_hash,
+    Buffer.from(password_salt),
     user_data,
   );
 }
 
-async function validatePassword(password: string, password_hash: string): Promise<boolean> {
-  return crypto.subtle.digest('SHA-256', new TextEncoder().encode(password)).then(hash => {
-    const hash_str = Array.from(new Uint8Array(hash))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-    return hash_str === password_hash;
-  });
+async function validatePassword(
+  password: string,
+  password_hash: string,
+  password_salt: Uint8Array,
+): Promise<boolean> {
+  // Use the PBKDF2 verification function
+  return verifyPasswordWithPBKDF2(password, password_hash, password_salt);
 }
 
 function decodeRowToUser(row: any) {
@@ -113,10 +126,16 @@ function decodeRowToUser(row: any) {
     // Check if row is an array and get the first element if it is
     const userData = Array.isArray(row) ? row[0] : row;
 
-    const { username, password_hash, id, user_data } = userData;
-    return { username, password_hash, id, user_data };
+    const { username, password_hash, password_salt, id, user_data } = userData;
+    return {
+      username,
+      password_hash,
+      password_salt: password_salt ? new Uint8Array(Buffer.from(password_salt)) : undefined,
+      id,
+      user_data,
+    };
   } catch (error) {
-    throw 'Failed to decode row to vector\n' + error;
+    throw 'Failed to decode row to user\n' + error;
   }
 }
 
@@ -128,7 +147,7 @@ async function getUser(username: string, sql: SqlStorage) {
 
   console.log({ username });
   const userQuery = sql.exec<Record<string, SqlStorageValue>>(
-    `SELECT id, username, password_hash, user_data
+    `SELECT id, username, password_hash, password_salt, user_data
      FROM users
      WHERE username = ?`,
     username, // Pass the username parameter here
@@ -166,28 +185,7 @@ async function validateApiKey(apiKey: string, sql: SqlStorage) {
   console.log('Validating API key...');
 
   // Get all keys from the database
-  const allKeys = sql.exec<Record<string, SqlStorageValue>>('SELECT * FROM user_keys');
-  const keys = allKeys.toArray();
-
-  console.log('All keys:', keys);
-
-  // We need to check each key by decrypting it
-  // Note: This approach requires storing the encryption key, which we're not doing
-  // For now, let's use a different approach - store a hash of the API key instead
-
-  // Hash the provided API key
-  const apiKeyHash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(apiKey));
-  const apiKeyHashArray = new Uint8Array(apiKeyHash);
-
-  console.log(
-    'API key hash:',
-    Array.from(apiKeyHashArray)
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join(''),
-  );
-
-  // Query for the hashed key
-  const userApiKeyQuery = sql.exec<Record<string, SqlStorageValue>>(
+  const allKeys = sql.exec<Record<string, SqlStorageValue>>(
     `SELECT id,
           user_id,
           key_label,
@@ -197,47 +195,95 @@ async function validateApiKey(apiKey: string, sql: SqlStorage) {
           last_used_at,
           revoked
    FROM user_keys
-   WHERE key_ciphertext = ?`,
-    Buffer.from(apiKeyHashArray),
+   WHERE revoked = 0`,
   );
+  const keys = allKeys.toArray();
 
-  const userKeyRow = userApiKeyQuery.toArray().at(0);
-  console.log('Query result:', { userKeyRow });
+  console.log('All keys:', keys);
 
-  if (!userKeyRow) {
-    console.log('No matching row found');
-    return false;
+  // We need to check each key by decrypting it
+  for (const key of keys) {
+    try {
+      const keyId = key.id as string;
+      const ciphertext = key.key_ciphertext as Buffer;
+      const iv = key.key_iv as Buffer;
+
+      // Get the encryption key from the global variable
+      // @ts-expect-error - global.__encryptionKeys is not defined in the type system
+      const encryptionKeyBytes = global.__encryptionKeys?.[keyId];
+      if (!encryptionKeyBytes) {
+        console.log(`No encryption key found for key ID ${keyId}`);
+        continue;
+      }
+
+      // Import the encryption key
+      const encryptionKey = await importKey(encryptionKeyBytes);
+
+      // Decrypt the API key
+      const decryptedApiKey = await decryptApiKey(
+        new Uint8Array(ciphertext),
+        new Uint8Array(iv),
+        encryptionKey,
+      );
+
+      // Compare the decrypted API key with the provided API key
+      if (decryptedApiKey === apiKey) {
+        console.log('API key is valid');
+
+        // Update the last_used_at timestamp
+        sql.exec(
+          `UPDATE user_keys
+           SET last_used_at = CURRENT_TIMESTAMP
+           WHERE id = ?`,
+          keyId,
+        );
+
+        return true;
+      }
+    } catch (error) {
+      console.error('Error decrypting API key:', error);
+      continue;
+    }
   }
 
-  // If we found a match, the API key is valid
-  console.log('API key is valid');
-  return true;
+  console.log('No matching API key found');
+  return false;
 }
 
 async function createApiKeyForUser(id: any, sql: SqlStorage): Promise<string> {
   // Generate a random API key
-  const apiKeyBytes = crypto.getRandomValues(new Uint8Array(32));
-  const apiKey = Array.from(apiKeyBytes)
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
+  const apiKey = generateApiKey();
 
-  // Hash the API key instead of encrypting it
-  const apiKeyHash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(apiKey));
-  const apiKeyHashArray = new Uint8Array(apiKeyHash);
+  // Generate an encryption key
+  const encryptionKey = await generateEncryptionKey();
 
-  // Generate a dummy IV for consistency with the schema
-  const iv = crypto.getRandomValues(new Uint8Array(12));
+  // Encrypt the API key
+  const { ciphertext, iv } = await encryptApiKey(apiKey, encryptionKey);
 
-  // Store the hashed key in the database
+  // Export the encryption key to raw bytes for storage
+  const encryptionKeyBytes = await exportKey(encryptionKey);
+
+  // Store the encrypted key in the database
   const keyId = uuidv4();
   sql.exec(
     `INSERT INTO user_keys (id, user_id, key_ciphertext, key_iv)
      VALUES (?, ?, ?, ?)`,
     keyId,
     id,
-    Buffer.from(apiKeyHashArray),
-    iv,
+    Buffer.from(ciphertext),
+    Buffer.from(iv),
   );
+
+  // We need to store the encryption key securely
+  // For now, we'll store it in a global variable, but in a production environment,
+  // it should be stored in a secure key management service
+  // @ts-expect-error - global.__encryptionKeys is not defined in the type system
+  if (!global.__encryptionKeys) {
+    // @ts-expect-error - global.__encryptionKeys is not defined in the type system
+    global.__encryptionKeys = {};
+  }
+  // @ts-expect-error - global.__encryptionKeys is not defined in the type system
+  global.__encryptionKeys[keyId] = encryptionKeyBytes;
 
   return apiKey;
 }
@@ -267,13 +313,8 @@ export class Gateway {
 
         const id: string = uuidv4();
 
-        const password_hash = await crypto.subtle
-          .digest('SHA-256', new TextEncoder().encode(password))
-          .then(hash => {
-            return Array.from(new Uint8Array(hash))
-              .map(b => b.toString(16).padStart(2, '0'))
-              .join('');
-          });
+        // Hash the password using PBKDF2
+        const { hash: password_hash, salt: password_salt } = await hashPasswordWithPBKDF2(password);
 
         console.log({ password_hash });
 
@@ -281,6 +322,7 @@ export class Gateway {
           id,
           username,
           password_hash,
+          password_salt,
           user_data: JSON.stringify(user_data ?? {}),
           sql: this.sql,
         });
@@ -307,7 +349,13 @@ export class Gateway {
           return { message: 'User not found' };
         }
 
-        if (!(await validatePassword(password, user.password_hash))) {
+        // Check if password_salt is available (for backward compatibility)
+        if (!user.password_salt) {
+          console.warn('User has no password_salt, cannot validate password with PBKDF2');
+          return { message: 'Bad credentials' };
+        }
+
+        if (!(await validatePassword(password, user.password_hash, user.password_salt))) {
           return { message: 'Bad credentials' };
         }
 

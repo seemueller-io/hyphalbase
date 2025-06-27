@@ -11,7 +11,10 @@
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
     "format": "prettier . --write",
-    "test": "(cd packages/hyphalbase; pnpm run test)",
+    "test": "pnpm -r run test",
+    "test:hyphalbase": "(cd packages/hyphalbase; pnpm run test)",
+    "test:sdk": "(cd packages/hyphalbase-sdk; pnpm run test)",
+    "dev": "(cd packages/hyphalbase; pnpm run dev)",
     "embeddings-server:start": "(cd crates/embeddings-server && cargo run)",
   	"deploy": "(cd packages/hyphalbase && pnpm run deploy)",
   	"deploy:secrets": "pnpm dlx wrangler secret bulk secrets.json -c packages/hyphalbase/wrangler.jsonc"
