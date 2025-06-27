@@ -1,13 +1,13 @@
+use async_openai::types::{CreateEmbeddingRequest, EmbeddingInput};
 use axum::{
-    Json, Router,
-    response::Json as ResponseJson,
-    routing::{get, post},
+	response::Json as ResponseJson, routing::{get, post},
+	Json,
+	Router,
 };
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
-use openai_api_rust::embeddings;
 use serde::{Deserialize, Serialize};
-use tower_http::trace::TraceLayer;
 use std::env;
+use tower_http::trace::TraceLayer;
 use tracing;
 
 const DEFAULT_SERVER_HOST: &str = "0.0.0.0";
@@ -18,20 +18,34 @@ async fn root() -> &'static str {
 }
 
 async fn embeddings_create(
-    Json(payload): Json<embeddings::EmbeddingsBody>,
+    Json(payload): Json<CreateEmbeddingRequest>,
 ) -> ResponseJson<serde_json::Value> {
     let model = TextEmbedding::try_new(
-        InitOptions::new(EmbeddingModel::NomicEmbedTextV15Q).with_show_download_progress(true),
+        InitOptions::new(EmbeddingModel::NomicEmbedTextV15).with_show_download_progress(true)
     )
     .expect("Failed to initialize model");
 
+
+	let embedding_input = payload.input;
+
+	let texts_from_embedding_input = match embedding_input {
+        EmbeddingInput::String(text) => vec![text],
+        EmbeddingInput::StringArray(texts) => texts,
+        EmbeddingInput::IntegerArray(_) => {
+            panic!("Integer array input not supported for text embeddings");
+        }
+        EmbeddingInput::ArrayOfIntegerArray(_) => {
+            panic!("Array of integer arrays not supported for text embeddings");
+        }
+    };
+
     let embeddings = model
-        .embed(payload.input, None)
+        .embed(texts_from_embedding_input, None)
         .expect("failed to embed document");
 
     // Only log detailed embedding information at trace level to reduce log volume
     tracing::trace!("Embeddings length: {}", embeddings.len());
-    tracing::trace!("Embedding dimension: {}", embeddings[0].len());
+    tracing::info!("Embedding dimension: {}", embeddings[0].len());
 
     // Log the first 10 values of the original embedding at trace level
     tracing::trace!("Original embedding preview: {:?}", &embeddings[0][..10.min(embeddings[0].len())]);
@@ -143,15 +157,13 @@ async fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use axum::body::Body;
-    use axum::body::to_bytes;
-    use axum::http::StatusCode;
-    use openai_api_rust::embeddings::EmbeddingsBody;
-    use openai_api_rust::*;
-    use tower::ServiceExt;
+	use super::*;
+	use axum::body::to_bytes;
+	use axum::body::Body;
+	use axum::http::StatusCode;
+	use tower::ServiceExt;
 
-    #[tokio::test]
+	#[tokio::test]
     async fn test_root() {
         let app = create_app();
         let response = app
@@ -175,15 +187,14 @@ mod tests {
         let app = create_app();
 
         // Use the OpenAI client with our test server
-        let auth = Auth::new("test-key"); // Use a dummy key for testing
-        let base_url = format!("http://127.0.0.1:{}/v1", 8080);
-        let openai = OpenAI::new(auth, &base_url);
 
-        let body = EmbeddingsBody {
+        let body = CreateEmbeddingRequest {
             model: "nomic-text-embed".to_string(),
-            input: vec!["The food was delicious and the waiter...".to_string()],
-            user: None,
-        };
+            input: EmbeddingInput::from(vec!["The food was delicious and the waiter...".to_string()]),
+			encoding_format: None,
+			user: None,
+			dimensions: Some(768),
+		};
 
         let response = app
             .oneshot(

@@ -23,11 +23,12 @@
 		"@types/node": "20.19.0",
 		"@types/uuid": "^9.0.7",
 		"bun": "^1.2.16",
+		"fast-cosine-similarity": "^1.2.2",
 		"miniflare": "^4.20250612.0",
+		"openai": "latest",
 		"typescript": "latest",
 		"vite": "latest",
 		"vitest": "latest",
-		"wrangler": "latest",
-		"openai": "latest"
+		"wrangler": "latest"
 	}
 }

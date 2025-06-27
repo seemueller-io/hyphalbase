@@ -179,3 +179,4 @@ todo
 /target/
 crates/embeddings-server/.fastembed_cache/
 /project/
+/pkg/

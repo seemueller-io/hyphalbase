@@ -245,6 +245,7 @@ describe('Document Operations', () => {
       );
 
       expect(searchResults).toBeDefined();
+      console.log({ searchResults });
       expect(searchResults.length).toBe(1);
       expect(searchResults[0].id).toBe(documentId);
       if (process.env['DEBUG'] === 'true') {
