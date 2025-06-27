@@ -1,0 +1,16 @@
+{
+  "name": "@hyphalbase/integration",
+  "version": "1.0.0",
+  "description": "for testing integrations between packages",
+  "main": "index.js",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+	"devDependencies": {
+		"vite": "^7.0.0",
+		"vitest": "^3.2.4"
+	}
+}

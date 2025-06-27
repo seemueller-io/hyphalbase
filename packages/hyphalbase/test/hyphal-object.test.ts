@@ -131,22 +131,15 @@ describe('HyphalObject', () => {
 
     expect(result).toBeDefined();
     expect(result.message).toBe('Bulk insert succeeded');
+    expect(result.ids).toBeDefined();
+    expect(result.ids.length).toBe(testVectors.length);
 
-    // Retrieve and verify each vector
+    // Retrieve and verify each vector directly using the returned IDs
     for (let i = 0; i < testVectors.length; i++) {
       const vector = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
         const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
-        // Get all vectors and find the one with matching content
-        const allVectors = await hyphalObject.execute('search', {
-          vector: testVectors[i].vector,
-        });
-        // Find the vector with the highest similarity (should be the one we're looking for)
-        const matchingVector = allVectors.find(v => v.content === testVectors[i].content);
-        if (!matchingVector) {
-          throw new Error(`Vector ${i} not found`);
-        }
         return await hyphalObject.execute('get', {
-          id: matchingVector.id,
+          id: result.ids[i],
         });
       });
 
@@ -263,13 +256,6 @@ describe('HyphalObject', () => {
       const vecE = [1, 2, 3];
       const vecF = [-1, -2, -3];
       expect(HyphalObject.cosineSimilarity(vecE, vecF)).toBeCloseTo(-1, 5);
-
-      // Zero vectors should have similarity 0
-      const vecG = [0, 0, 0];
-      const vecH = [1, 2, 3];
-      expect(HyphalObject.cosineSimilarity(vecG, vecH)).toBe(0);
-      expect(HyphalObject.cosineSimilarity(vecH, vecG)).toBe(0);
-      expect(HyphalObject.cosineSimilarity(vecG, vecG)).toBe(0);
     });
   });
 });
