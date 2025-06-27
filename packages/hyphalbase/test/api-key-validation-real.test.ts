@@ -13,7 +13,7 @@ describe('API Key Validation with Real Environment', () => {
     username = `testuser_${uniqueSuffix}`;
 
     // Create a test user
-    const createUserResponse = await SELF.fetch('https://example.com/graphql', {
+    const createUserResponse = await SELF.fetch('https://example.com/admin', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -39,7 +39,7 @@ describe('API Key Validation with Real Environment', () => {
     console.log(`Created user with ID: ${userId}`);
 
     // Create an API key for the test user
-    const createApiKeyResponse = await SELF.fetch('https://example.com/graphql', {
+    const createApiKeyResponse = await SELF.fetch('https://example.com/admin', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -67,7 +67,7 @@ describe('API Key Validation with Real Environment', () => {
 
   it('should validate a valid API key', async () => {
     // Validate the API key
-    const validateResponse = await SELF.fetch('https://example.com/graphql', {
+    const validateResponse = await SELF.fetch('https://example.com/admin', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -92,7 +92,7 @@ describe('API Key Validation with Real Environment', () => {
 
   it('should not validate an invalid API key', async () => {
     // Validate an invalid API key
-    const validateResponse = await SELF.fetch('https://example.com/graphql', {
+    const validateResponse = await SELF.fetch('https://example.com/admin', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -118,7 +118,7 @@ describe('API Key Validation with Real Environment', () => {
   // Add a test to directly query the database to see the stored key_ciphertext
   it('should directly query the database to see the stored key_ciphertext', async () => {
     // Query the database to get all user_keys
-    const queryResponse = await SELF.fetch('https://example.com/graphql', {
+    const queryResponse = await SELF.fetch('https://example.com/admin', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

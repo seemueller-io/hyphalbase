@@ -1,7 +1,7 @@
 import { createYoga, createSchema } from 'graphql-yoga';
 
 import AdminSchema from './admin-schema';
-import Schema from './api-schema';
+import ApiSchema from './api-schema';
 import { Gateway } from './gateway';
 import { HyphalObject } from './hyphal-object';
 export class SQLiteDurableObject implements DurableObject {
@@ -14,20 +14,18 @@ export class SQLiteDurableObject implements DurableObject {
     this.gateway = new Gateway(ctx.storage.sql);
     this.hyphal_object = new HyphalObject(ctx.storage.sql);
 
-    // Create GraphQL schema based on HyphalObject interface
-    const apiSchema = createSchema(Schema(this));
     const adminApiSchema = createSchema(AdminSchema(this));
-
-    // admin api for managing users
+    // admin api
     this.adminApi = createYoga({
       schema: adminApiSchema,
-      graphqlEndpoint: '/graphql',
+      graphqlEndpoint: '/admin',
       graphiql: {
-        endpoint: '/graphql',
+        endpoint: '/admin',
       },
     });
 
-    // core api features for vectors
+    const apiSchema = createSchema<{ apiKey: string }>(ApiSchema(this));
+    // vector api
     this.api = createYoga({
       schema: apiSchema,
       context: options => {
@@ -53,7 +51,7 @@ export class SQLiteDurableObject implements DurableObject {
       return new Response('Bad Request', { status: 400 });
     }
 
-    if (path === '/' || path === '/graphql' || path === '/igraphql') {
+    if (path === '/' || path.includes('/admin')) {
       console.log('serve admin');
 
       // If it's a POST request, check if it's for user management or API key validation
@@ -69,24 +67,22 @@ export class SQLiteDurableObject implements DurableObject {
             body?.query &&
             (body?.query.includes('createUser') ||
               body?.query.includes('createApiKeyForUser') ||
-              body?.query.includes('validateApiKey') ||
-              body?.query.includes('getAllUserKeys'));
+              body?.query.includes('validateApiKey'));
 
           if (isUserManagementOrApiKeyValidation) {
             return this.adminApi.fetch(request);
           }
-
-          // Check if the request is for a mutation or query that's in the API schema
-
-          // Route to the API schema
         } catch (e) {
-          // If we can't parse the body as JSON, just continue with the admin API
+          // ignore error and continue
         }
       }
       return this.adminApi.fetch(request);
     }
-
-    return this.api.fetch(request);
+    if (path === '/graphql') {
+      // Route to the API schema
+      return this.api.fetch(request);
+    }
+    return new Response('Not Found', { status: 404 });
   }
 }
 
