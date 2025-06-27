@@ -178,4 +178,3 @@ todo
 
 /target/
 crates/embeddings-server/.fastembed_cache/
-/secrets.json/
