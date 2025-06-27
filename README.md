@@ -35,7 +35,7 @@ cd packages/hyphalbase && pnpm dev
 
 # Development Setup:
 
-# 1. Navigate to the admin control interface http://localhost:8787 in your browser
+# 1. Navigate to the admin control interface http://localhost:8787/admin in your browser
 
 # 2. Using the GraphQL interface:
 
@@ -43,7 +43,7 @@ cd packages/hyphalbase && pnpm dev
 
 # - Generate an API key for the user
 
-# 3. Navigate to the interface at http://localhost:8787/api
+# 3. Navigate to the interface at http://localhost:8787/graphql
 
 # 4. Create an embedding query
 
