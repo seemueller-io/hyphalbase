@@ -7,7 +7,11 @@ use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
 use openai_api_rust::embeddings;
 use serde::{Deserialize, Serialize};
 use tower_http::trace::TraceLayer;
+use std::env;
 use tracing;
+
+const DEFAULT_SERVER_HOST: &str = "0.0.0.0";
+const DEFAULT_SERVER_PORT: &str = "8080";
 
 async fn root() -> &'static str {
     "Hello, World!"
@@ -128,7 +132,12 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
     let app = create_app();
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
+
+	let server_host = env::var("SERVER_HOST").unwrap_or_else(|_| DEFAULT_SERVER_HOST.to_string());
+	let server_port = env::var("SERVER_PORT").unwrap_or_else(|_| DEFAULT_SERVER_PORT.to_string());
+	let server_address = format!("{}:{}", server_host, server_port);
+	let listener = tokio::net::TcpListener::bind(server_address).await.unwrap();
+	tracing::info!("Listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap();
 }
 

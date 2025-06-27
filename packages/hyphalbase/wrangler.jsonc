@@ -1,9 +1,14 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "durable-objects",
+	"name": "hyphalbase",
+	"workers_dev": true,
+	"preview_urls": false,
 	"main": "src/index.ts",
 	"compatibility_date": "2025-06-01",
-	"compatibility_flags": ["nodejs_compat", "nodejs_compat_populate_process_env"],
+	"compatibility_flags": [
+		"nodejs_compat",
+		"nodejs_compat_populate_process_env"
+	],
 	"durable_objects": {
 		"bindings": [
 			{
