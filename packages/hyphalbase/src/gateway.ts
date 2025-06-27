@@ -120,16 +120,6 @@ function decodeRowToUser(row: any) {
   }
 }
 
-function decodeRowToUserKey(row: any) {
-  try {
-    const { id, user_id, key_label, key_ciphertext, key_iv, created_at, last_used_at, revoked } =
-      row;
-    return { id, user_id, key_label, key_ciphertext, key_iv, created_at, last_used_at, revoked };
-  } catch (error) {
-    throw 'Failed to decode row to vector\n' + error;
-  }
-}
-
 async function getUser(username: string, sql: SqlStorage) {
   // Temporary: Get all users for debugging
   // const allUsers = sql.exec<Record<string, SqlStorageValue>>('SELECT * FROM users');
