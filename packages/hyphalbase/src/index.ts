@@ -44,7 +44,6 @@ export class SQLiteDurableObject implements DurableObject {
   async fetch(request: Request) {
     const url = new URL(request.url);
     const path = url.pathname;
-    console.log({ path });
 
     // Handle SQL endpoint for backward compatibility
     if (path === '/sql') {
@@ -52,8 +51,6 @@ export class SQLiteDurableObject implements DurableObject {
     }
 
     if (path === '/' || path.includes('/admin')) {
-      console.log('serve admin');
-
       // If it's a POST request, check if it's for user management or API key validation
       if (request.method === 'POST') {
         // Clone the request to read its body

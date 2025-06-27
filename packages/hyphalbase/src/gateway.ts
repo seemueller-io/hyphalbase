@@ -145,7 +145,6 @@ async function getUser(username: string, sql: SqlStorage) {
   // console.log('All users:', allUsers.toArray());
   // console.log('Raw rows:', JSON.stringify(allUsers));
 
-  console.log({ username });
   const userQuery = sql.exec<Record<string, SqlStorageValue>>(
     `SELECT id, username, password_hash, password_salt, user_data
      FROM users
@@ -155,8 +154,6 @@ async function getUser(username: string, sql: SqlStorage) {
 
   const user = userQuery.toArray().at(0);
 
-  console.log({ user });
-
   if (!user) {
     return null;
   }
@@ -165,13 +162,9 @@ async function getUser(username: string, sql: SqlStorage) {
 }
 
 async function getAllUserKeys(sql: SqlStorage): Promise<UserKey[]> {
-  console.log('Getting all user keys...');
-
   // Get all keys from the database
   const allKeys = sql.exec<Record<string, SqlStorageValue>>('SELECT * FROM user_keys');
   const keys = allKeys.toArray();
-
-  console.log('All keys:', keys);
 
   // Transform the keys to the expected format
   return keys.map(key => ({
@@ -182,8 +175,6 @@ async function getAllUserKeys(sql: SqlStorage): Promise<UserKey[]> {
 }
 
 async function validateApiKey(apiKey: string, sql: SqlStorage) {
-  console.log('Validating API key...');
-
   // Get all keys from the database
   const allKeys = sql.exec<Record<string, SqlStorageValue>>(
     `SELECT id,
@@ -199,8 +190,6 @@ async function validateApiKey(apiKey: string, sql: SqlStorage) {
   );
   const keys = allKeys.toArray();
 
-  console.log('All keys:', keys);
-
   // We need to check each key by decrypting it
   for (const key of keys) {
     try {
@@ -212,7 +201,6 @@ async function validateApiKey(apiKey: string, sql: SqlStorage) {
       // @ts-expect-error - global.__encryptionKeys is not defined in the type system
       const encryptionKeyBytes = global.__encryptionKeys?.[keyId];
       if (!encryptionKeyBytes) {
-        console.log(`No encryption key found for key ID ${keyId}`);
         continue;
       }
 
@@ -228,8 +216,6 @@ async function validateApiKey(apiKey: string, sql: SqlStorage) {
 
       // Compare the decrypted API key with the provided API key
       if (decryptedApiKey === apiKey) {
-        console.log('API key is valid');
-
         // Update the last_used_at timestamp
         sql.exec(
           `UPDATE user_keys
@@ -241,12 +227,10 @@ async function validateApiKey(apiKey: string, sql: SqlStorage) {
         return true;
       }
     } catch (error) {
-      console.error('Error decrypting API key:', error);
       continue;
     }
   }
 
-  console.log('No matching API key found');
   return false;
 }
 
@@ -316,8 +300,6 @@ export class Gateway {
         // Hash the password using PBKDF2
         const { hash: password_hash, salt: password_salt } = await hashPasswordWithPBKDF2(password);
 
-        console.log({ password_hash });
-
         const result = await createUser({
           id,
           username,
@@ -326,8 +308,6 @@ export class Gateway {
           user_data: JSON.stringify(user_data ?? {}),
           sql: this.sql,
         });
-
-        console.log({ result: result.toArray() });
 
         return { id };
       }
@@ -339,11 +319,7 @@ export class Gateway {
           return { message: 'User not found' };
         }
 
-        console.log({ row: JSON.stringify(row) });
-
         const user = decodeRowToUser(row);
-
-        console.log({ user: JSON.stringify(user) });
 
         if (!user) {
           return { message: 'User not found' };
@@ -351,7 +327,6 @@ export class Gateway {
 
         // Check if password_salt is available (for backward compatibility)
         if (!user.password_salt) {
-          console.warn('User has no password_salt, cannot validate password with PBKDF2');
           return { message: 'Bad credentials' };
         }
 
