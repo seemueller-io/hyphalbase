@@ -282,6 +282,6 @@ describe('Document Operations', () => {
 
       expect(deletedDocument).toBeNull();
     },
-    { timeout: 10000 },
+    { timeout: 20000 },
   ); // inferencing in ci takes a while
 });
