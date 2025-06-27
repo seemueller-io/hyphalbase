@@ -509,7 +509,7 @@ export class HyphalObject {
 
           return { message: 'Delete Succeeded' };
         } catch (error) {
-          console.error('Error deleting document:', error);
+          // Error handled without logging sensitive information
           return { message: 'Delete Failed' };
         }
       }
@@ -585,7 +585,7 @@ export class HyphalObject {
               score: row.score,
             });
           } catch (error) {
-            console.error(`Error retrieving parent document ${parentId}:`, error);
+            // Error handled without logging sensitive information
           }
         }
       } else {

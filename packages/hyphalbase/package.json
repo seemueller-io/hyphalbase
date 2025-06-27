@@ -8,7 +8,8 @@
 		"test": "vitest run",
 		"postinstall": "wrangler types --include-runtime && pnpm dlx bun build.graphql-schema.ts && pnpm --filter \"*\" run generate",
 		"build": "wrangler build",
-		"deploy": "wrangler deploy -c ./wrangler.jsonc"
+		"deploy": "wrangler deploy -c ./wrangler.jsonc",
+		"deployment:remove": "wrangler delete -c ./wrangler.jsonc"
 	},
 	"dependencies": {
 		"graphql": "^16.8.1",
