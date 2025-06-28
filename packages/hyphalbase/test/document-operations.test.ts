@@ -1,11 +1,110 @@
 // eslint-disable-next-line import/no-unresolved
 import { SELF, env, runInDurableObject } from 'cloudflare:test';
-import { expect, it, describe } from 'vitest';
+import { expect, it, describe, beforeEach } from 'vitest';
 
 import { SQLiteDurableObject } from '../src';
+import { Gateway } from '../src/gateway';
 import { HyphalObject } from '../src/hyphal-object';
 
+// DummyGateway class for testing
+class DummyGateway {
+  private user = { username: 'test-user', id: 'test-id', user_data: {} };
+
+  constructor(private sql: SqlStorage) {}
+
+  getUser() {
+    return this.user;
+  }
+}
+
+// Helper function to create a real Gateway with a test user
+async function createRealGateway(sql) {
+  const gateway = new Gateway(sql);
+
+  // Create a unique username for this test
+  const uniqueUsername = `test-user-${Math.random().toString(36).substring(2, 10)}`;
+
+  // Create a test user
+  await gateway.execute('create_user', {
+    username: uniqueUsername,
+    password: 'test-password',
+    user_data: {},
+  });
+
+  // Create an API key for the user
+  const { apiKey } = await gateway.execute('create_api_key_for_user', {
+    username: uniqueUsername,
+    password: 'test-password',
+  });
+
+  // Authenticate with the API key
+  await gateway.execute('get_user_from_key', {
+    apiKey,
+  });
+
+  return gateway;
+}
+
 describe('Document Operations', () => {
+  let username: string = '';
+  let userId: string = '';
+  let apiKey: string = '';
+  beforeEach(async () => {
+    // Generate a unique username for each test run
+    const uniqueSuffix = Math.floor(Math.random() * 1000000);
+    username = `testuser_${uniqueSuffix}`;
+
+    // Create a test user
+    const createUserResponse = await SELF.fetch('https://example.com/admin', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: `
+          mutation {
+            createUser(input: {
+              username: "${username}",
+              password: "password123"
+            }) {
+              id
+            }
+          }
+        `,
+      }),
+    });
+
+    expect(createUserResponse.status).toBe(200);
+    const createUserData = await createUserResponse.json();
+    userId = Object(createUserData).data.createUser.id;
+    console.log(`Created user with ID: ${userId}`);
+
+    // Create an API key for the test user
+    const createApiKeyResponse = await SELF.fetch('https://example.com/admin', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': 'test-api-key', // Add API key for authentication
+      },
+      body: JSON.stringify({
+        query: `
+          mutation {
+            createApiKeyForUser(input: {
+              username: "${username}",
+              password: "password123"
+            }) {
+              apiKey
+            }
+          }
+        `,
+      }),
+    });
+
+    expect(createApiKeyResponse.status).toBe(200);
+    const createApiKeyData = await createApiKeyResponse.json();
+    apiKey = Object(createApiKeyData).data.createApiKeyForUser.apiKey;
+    console.log(`Created API key: ${apiKey}`);
+  });
   // Test storing and retrieving a document
   it('should store and retrieve a document', async () => {
     const id = env.SQL.idFromName('/document-test');
@@ -13,7 +112,8 @@ describe('Document Operations', () => {
 
     // Store a document
     const documentId = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
-      const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+      const gateway = await createRealGateway(instance.ctx.storage.sql);
+      const hyphalObject = new HyphalObject(instance.ctx.storage.sql, gateway);
       const result = await hyphalObject.execute('storeDocument', {
         namespace: 'test-documents',
         content: 'This is a test document with some content for searching.',
@@ -25,7 +125,8 @@ describe('Document Operations', () => {
 
     // Retrieve the document
     const document = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
-      const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+      const gateway = await createRealGateway(instance.ctx.storage.sql);
+      const hyphalObject = new HyphalObject(instance.ctx.storage.sql, gateway);
       return await hyphalObject.execute('getDocument', {
         id: documentId,
       });
@@ -44,7 +145,8 @@ describe('Document Operations', () => {
 
     // Store multiple documents
     const documentIds = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
-      const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+      const gateway = await createRealGateway(instance.ctx.storage.sql);
+      const hyphalObject = new HyphalObject(instance.ctx.storage.sql, gateway);
 
       // Store three documents with different content
       const doc1 = await hyphalObject.execute('storeDocument', {
@@ -69,7 +171,8 @@ describe('Document Operations', () => {
 
     // Search for documents related to "machine learning"
     const searchResults1 = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
-      const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+      const gateway = await createRealGateway(instance.ctx.storage.sql);
+      const hyphalObject = new HyphalObject(instance.ctx.storage.sql, gateway);
       return await hyphalObject.execute('searchDocuments', {
         query: 'machine learning',
         namespace: 'test-search',
@@ -93,7 +196,8 @@ describe('Document Operations', () => {
 
     // Search for documents related to "database"
     const searchResults2 = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
-      const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+      const gateway = await createRealGateway(instance.ctx.storage.sql);
+      const hyphalObject = new HyphalObject(instance.ctx.storage.sql, gateway);
       return await hyphalObject.execute('searchDocuments', {
         query: 'database',
         namespace: 'test-search',
@@ -123,7 +227,8 @@ describe('Document Operations', () => {
 
     // Store a document
     const documentId = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
-      const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+      const gateway = await createRealGateway(instance.ctx.storage.sql);
+      const hyphalObject = new HyphalObject(instance.ctx.storage.sql, gateway);
       const result = await hyphalObject.execute('storeDocument', {
         namespace: 'test-delete',
         content: 'This document will be deleted.',
@@ -135,7 +240,8 @@ describe('Document Operations', () => {
 
     // Verify document exists
     const document = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
-      const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+      const gateway = await createRealGateway(instance.ctx.storage.sql);
+      const hyphalObject = new HyphalObject(instance.ctx.storage.sql, gateway);
       try {
         return await hyphalObject.execute('getDocument', {
           id: documentId,
@@ -149,7 +255,8 @@ describe('Document Operations', () => {
 
     // Delete the document
     const deleteResult = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
-      const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+      const gateway = await createRealGateway(instance.ctx.storage.sql);
+      const hyphalObject = new HyphalObject(instance.ctx.storage.sql, gateway);
       return await hyphalObject.execute('deleteDocument', {
         ids: [documentId],
       });
@@ -162,7 +269,8 @@ describe('Document Operations', () => {
     const deletedDocument = await runInDurableObject(
       stub,
       async (instance: SQLiteDurableObject) => {
-        const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+        const gateway = await createRealGateway(instance.ctx.storage.sql);
+        const hyphalObject = new HyphalObject(instance.ctx.storage.sql, gateway);
         try {
           return await hyphalObject.execute('getDocument', {
             id: documentId,
@@ -200,7 +308,8 @@ describe('Document Operations', () => {
 
       // Store the large document
       const documentId = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
-        const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+        const gateway = await createRealGateway(instance.ctx.storage.sql);
+        const hyphalObject = new HyphalObject(instance.ctx.storage.sql, gateway);
         const result = await hyphalObject.execute('storeDocument', {
           namespace: 'test-large-documents',
           content: largeContent,
@@ -215,7 +324,8 @@ describe('Document Operations', () => {
 
       // Retrieve the large document
       const document = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
-        const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+        const gateway = await createRealGateway(instance.ctx.storage.sql);
+        const hyphalObject = new HyphalObject(instance.ctx.storage.sql, gateway);
         return await hyphalObject.execute('getDocument', {
           id: documentId,
         });
@@ -235,7 +345,8 @@ describe('Document Operations', () => {
       const searchResults = await runInDurableObject(
         stub,
         async (instance: SQLiteDurableObject) => {
-          const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+          const gateway = await createRealGateway(instance.ctx.storage.sql);
+          const hyphalObject = new HyphalObject(instance.ctx.storage.sql, gateway);
           return await hyphalObject.execute('searchDocuments', {
             query: 'paragraph number 500',
             namespace: 'test-large-documents',
@@ -254,7 +365,8 @@ describe('Document Operations', () => {
 
       // Delete the large document
       const deleteResult = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
-        const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+        const gateway = await createRealGateway(instance.ctx.storage.sql);
+        const hyphalObject = new HyphalObject(instance.ctx.storage.sql, gateway);
         return await hyphalObject.execute('deleteDocument', {
           ids: [documentId],
         });
@@ -270,7 +382,8 @@ describe('Document Operations', () => {
       const deletedDocument = await runInDurableObject(
         stub,
         async (instance: SQLiteDurableObject) => {
-          const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+          const gateway = await createRealGateway(instance.ctx.storage.sql);
+          const hyphalObject = new HyphalObject(instance.ctx.storage.sql, gateway);
           try {
             return await hyphalObject.execute('getDocument', {
               id: documentId,

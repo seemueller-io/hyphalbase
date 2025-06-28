@@ -3,15 +3,45 @@ import { env, runInDurableObject } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 
 import { SQLiteDurableObject } from '../src';
+import { Gateway } from '../src/gateway';
 import { HyphalObject } from '../src/hyphal-object';
+
+// Helper function to create a real Gateway with a test user
+async function createRealGateway(sql) {
+  const gateway = new Gateway(sql);
+
+  // Create a unique username for this test
+  const uniqueUsername = `test-user-${Math.random().toString(36).substring(2, 10)}`;
+
+  // Create a test user
+  await gateway.execute('create_user', {
+    username: uniqueUsername,
+    password: 'test-password',
+    user_data: {},
+  });
+
+  // Create an API key for the user
+  const { apiKey } = await gateway.execute('create_api_key_for_user', {
+    username: uniqueUsername,
+    password: 'test-password',
+  });
+
+  // Authenticate with the API key
+  await gateway.execute('get_user_from_key', {
+    apiKey,
+  });
+
+  return gateway;
+}
 
 describe('HyphalObject', () => {
   it('should create a hyphal object', async () => {
     const id = env.SQL.idFromName('/gql');
     const stub = env.SQL.get(id);
-    const hyphalObject = await runInDurableObject(stub, (instance: SQLiteDurableObject) => {
+    const hyphalObject = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
       expect(instance).toBeInstanceOf(SQLiteDurableObject); // Exact same class as import
-      return new HyphalObject(instance.ctx.storage.sql);
+      const gateway = await createRealGateway(instance.ctx.storage.sql);
+      return new HyphalObject(instance.ctx.storage.sql, gateway);
     });
     expect(hyphalObject).toBeDefined();
   });
@@ -19,8 +49,9 @@ describe('HyphalObject', () => {
   it('should create a hyphal object with a custom namespace', async () => {
     const id = env.SQL.idFromName('/custom-namespace');
     const stub = env.SQL.get(id);
-    const hyphalObject = await runInDurableObject(stub, (instance: SQLiteDurableObject) => {
-      return new HyphalObject(instance.ctx.storage.sql);
+    const hyphalObject = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
+      const gateway = await createRealGateway(instance.ctx.storage.sql);
+      return new HyphalObject(instance.ctx.storage.sql, gateway);
     });
     expect(hyphalObject).toBeDefined();
   });
@@ -32,7 +63,8 @@ describe('HyphalObject', () => {
 
     // First call: Store a vector
     const vectorId = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
-      const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+      const gateway = await createRealGateway(instance.ctx.storage.sql);
+      const hyphalObject = new HyphalObject(instance.ctx.storage.sql, gateway);
       const result = await hyphalObject.execute('put', {
         namespace: 'test-persistence',
         content: 'persistence test content',
@@ -45,7 +77,8 @@ describe('HyphalObject', () => {
 
     // Second call: Retrieve the vector
     const vector = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
-      const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+      const gateway = await createRealGateway(instance.ctx.storage.sql);
+      const hyphalObject = new HyphalObject(instance.ctx.storage.sql, gateway);
       return await hyphalObject.execute('get', { id: vectorId });
     });
 
@@ -66,7 +99,8 @@ describe('HyphalObject', () => {
 
     // First: Store a vector
     const vectorId = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
-      const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+      const gateway = await createRealGateway(instance.ctx.storage.sql);
+      const hyphalObject = new HyphalObject(instance.ctx.storage.sql, gateway);
       const result = await hyphalObject.execute('put', {
         namespace: 'test-recreate',
         content: 'recreate test content',
@@ -83,7 +117,8 @@ describe('HyphalObject', () => {
 
     // Retrieve the vector from the "new" Durable Object instance
     const vector = await runInDurableObject(sameStub, async (instance: SQLiteDurableObject) => {
-      const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+      const gateway = await createRealGateway(instance.ctx.storage.sql);
+      const hyphalObject = new HyphalObject(instance.ctx.storage.sql, gateway);
       return await hyphalObject.execute('get', { id: vectorId });
     });
 
@@ -123,7 +158,8 @@ describe('HyphalObject', () => {
 
     // Insert vectors using bulkPut
     const result = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
-      const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+      const gateway = await createRealGateway(instance.ctx.storage.sql);
+      const hyphalObject = new HyphalObject(instance.ctx.storage.sql, gateway);
       return await hyphalObject.execute('bulkPut', {
         vectors: testVectors,
       });
@@ -137,7 +173,8 @@ describe('HyphalObject', () => {
     // Retrieve and verify each vector directly using the returned IDs
     for (let i = 0; i < testVectors.length; i++) {
       const vector = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
-        const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+        const gateway = await createRealGateway(instance.ctx.storage.sql);
+        const hyphalObject = new HyphalObject(instance.ctx.storage.sql, gateway);
         return await hyphalObject.execute('get', {
           id: result.ids[i],
         });
@@ -181,7 +218,8 @@ describe('HyphalObject', () => {
 
     // Insert vectors and collect their IDs
     const vectorIds = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
-      const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+      const gateway = await createRealGateway(instance.ctx.storage.sql);
+      const hyphalObject = new HyphalObject(instance.ctx.storage.sql, gateway);
       const ids = [];
 
       // Insert each vector individually to get their IDs
@@ -202,7 +240,8 @@ describe('HyphalObject', () => {
     // Verify vectors were inserted
     for (let i = 0; i < vectorIds.length; i++) {
       const vector = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
-        const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+        const gateway = await createRealGateway(instance.ctx.storage.sql);
+        const hyphalObject = new HyphalObject(instance.ctx.storage.sql, gateway);
         try {
           return await hyphalObject.execute('get', {
             id: vectorIds[i],
@@ -216,7 +255,8 @@ describe('HyphalObject', () => {
 
     // Delete all vectors at once
     const deleteResult = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
-      const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+      const gateway = await createRealGateway(instance.ctx.storage.sql);
+      const hyphalObject = new HyphalObject(instance.ctx.storage.sql, gateway);
       return await hyphalObject.execute('delete', { ids: vectorIds });
     });
 
@@ -226,7 +266,8 @@ describe('HyphalObject', () => {
     // Verify vectors were deleted
     for (let i = 0; i < vectorIds.length; i++) {
       const vector = await runInDurableObject(stub, async (instance: SQLiteDurableObject) => {
-        const hyphalObject = new HyphalObject(instance.ctx.storage.sql);
+        const gateway = await createRealGateway(instance.ctx.storage.sql);
+        const hyphalObject = new HyphalObject(instance.ctx.storage.sql, gateway);
         try {
           return await hyphalObject.execute('get', {
             id: vectorIds[i],

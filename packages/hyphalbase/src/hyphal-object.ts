@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { chunkDocument, checkTokenLimit } from './chunker';
 import { generateEmbedding } from './embed';
+import { Gateway } from './gateway';
 
 export interface PutVectorInput {
   /** Optional UUID; server autogenerates if omitted */
@@ -132,9 +133,6 @@ interface OperationMap {
 }
 
 function createTable(sql: SqlStorage) {
-  // Skip creating users table as it's already created by Gateway
-  // This avoids conflicts between different schema definitions
-
   // Create namespaces table (owned by users)
   sql.exec(`
     CREATE TABLE IF NOT EXISTS namespaces(
@@ -191,7 +189,6 @@ function createTable(sql: SqlStorage) {
 }
 
 type InsertVectorArgs = {
-  sql: SqlStorage;
   id: string;
   namespace: string;
   blob: Buffer;
@@ -200,50 +197,8 @@ type InsertVectorArgs = {
   is_chunk?: number;
   user_id?: string;
 };
-function insertVector(args: InsertVectorArgs) {
-  const {
-    sql,
-    id,
-    namespace,
-    blob,
-    content,
-    parent_id = null,
-    is_chunk = 0,
-    user_id = 'default_user',
-  } = args;
 
-  // For backward compatibility, also insert into legacy_vectors table
-  sql.exec(
-    `INSERT OR REPLACE INTO legacy_vectors (id, namespace, vectors, content, parent_id, is_chunk)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    id,
-    namespace,
-    blob,
-    content,
-    parent_id,
-    is_chunk,
-  );
-
-  // Check if user exists, create if not
-  const userExists = sql.exec(`SELECT id FROM users WHERE id = ?`, [user_id]);
-  const userRows = [];
-  for (const row of userExists) {
-    userRows.push(row);
-  }
-
-  if (userRows.length === 0) {
-    // Insert a minimal user record for compatibility
-    sql.exec(
-      `INSERT INTO users (id, username, password_hash, password_salt, user_data)
-       VALUES (?, ?, ?, ?, ?)`,
-      user_id,
-      user_id,
-      'placeholder',
-      Buffer.from([]),
-      '{}',
-    );
-  }
-
+function ensureNamespace(namespace: string, user_id: string, sql: SqlStorage) {
   // Check if namespace exists, create if not
   const namespaceId = `${namespace}_${user_id}`;
   const namespaceExists = sql.exec(`SELECT id FROM namespaces WHERE id = ?`, [namespaceId]);
@@ -260,7 +215,17 @@ function insertVector(args: InsertVectorArgs) {
       user_id,
     );
   }
+  return namespaceId;
+}
 
+function ensureDocument(
+  parent_id: string | null,
+  id: string,
+  sql: SqlStorage,
+  namespaceId: string,
+  content: string,
+  is_chunk: number,
+) {
   // Create or update document
   const documentId = parent_id || id;
   sql.exec(
@@ -271,8 +236,16 @@ function insertVector(args: InsertVectorArgs) {
     parent_id ? '' : content, // Only store content in parent document
     parent_id ? 1 : is_chunk ? 1 : 0,
   );
+  return documentId;
+}
 
-  // Create content entry
+function createContentRecord(
+  id: string,
+  sql: SqlStorage,
+  documentId: string,
+  content: string,
+  is_chunk: number,
+) {
   const contentId = id;
   sql.exec(
     `INSERT OR REPLACE INTO content (id, document_id, text, is_chunk)
@@ -282,8 +255,15 @@ function insertVector(args: InsertVectorArgs) {
     content,
     is_chunk,
   );
+  return contentId;
+}
 
-  // Create vector entry
+function createVectorRecord(
+  sql: SqlStorage,
+  id: string,
+  contentId: string,
+  blob: Buffer<ArrayBufferLike>,
+) {
   return sql.exec(
     `INSERT OR REPLACE INTO vectors (id, content_id, vectors)
      VALUES (?, ?, ?)`,
@@ -292,6 +272,7 @@ function insertVector(args: InsertVectorArgs) {
     blob,
   );
 }
+
 type GetVectorArgs = { sql: SqlStorage; id: string };
 function getVector(args: GetVectorArgs) {
   const { sql, id } = args;
@@ -510,8 +491,13 @@ function deleteAllVectors(sql: SqlStorage) {
   return true;
 }
 
+export type HyphalContextType = { gateway: Gateway };
+
 export class HyphalObject {
-  constructor(private sql: SqlStorage) {
+  constructor(
+    private sql: SqlStorage,
+    private gateway: Gateway,
+  ) {
     if (sql) {
       createTable(sql);
     }
@@ -522,6 +508,34 @@ export class HyphalObject {
     payload: OperationMap[Op]['payload'],
   ): Promise<OperationMap[Op]['response']> {
     return this.execute(operation, payload);
+  }
+
+  private insertVector(args: InsertVectorArgs) {
+    const {
+      id,
+      namespace,
+      blob,
+      content,
+      parent_id = null,
+      is_chunk = 0,
+      user_id = 'default_user',
+    } = args;
+
+    const user = this.gateway.getUser();
+
+    if (!user) {
+      return { message: 'User not found' };
+    }
+
+    const namespaceId = is_chunk ? namespace : ensureNamespace(namespace, user.id, this.sql);
+
+    const documentId = is_chunk
+      ? parent_id
+      : ensureDocument(parent_id, id, this.sql, namespaceId, content, is_chunk);
+
+    const contentId = createContentRecord(id, this.sql, documentId!, content, is_chunk);
+
+    return createVectorRecord(this.sql, id, contentId, blob);
   }
 
   async execute<Op extends keyof OperationMap>(
@@ -536,12 +550,11 @@ export class HyphalObject {
 
         const blob = Buffer.from(this.encodeVectorToBlob(vector));
 
-        insertVector({
+        this.insertVector({
           id,
           namespace,
           blob,
           content,
-          sql: this.sql,
         });
 
         return { id };
@@ -660,7 +673,6 @@ export class HyphalObject {
 
         // Insert all vectors in a single transaction
         this.bulkInsertVectors({
-          sql: this.sql,
           vectors: processedVectors,
         });
 
@@ -678,6 +690,8 @@ export class HyphalObject {
       case 'storeDocument': {
         const { id: rxId, namespace, content } = payload as StoreDocumentPayload;
 
+        const user = this.gateway.getUser();
+
         const id: string = rxId ?? uuidv4();
 
         // Check if the document exceeds the token limit (8000 tokens)
@@ -692,12 +706,12 @@ export class HyphalObject {
           const blob = Buffer.from(this.encodeVectorToBlob(vector));
 
           // Store the document as a vector
-          insertVector({
+          this.insertVector({
             id,
             namespace,
             blob,
             content,
-            sql: this.sql,
+            user_id: user?.id,
           });
 
           return { id };
@@ -709,12 +723,11 @@ export class HyphalObject {
           });
 
           // Store metadata about the full document
-          insertVector({
+          this.insertVector({
             id,
             namespace,
             blob: Buffer.from(new Uint8Array(0)), // Empty vector for the parent
             content, // Store the full content in the parent
-            sql: this.sql,
             is_chunk: 0, // This is the parent document
           });
 
@@ -747,7 +760,6 @@ export class HyphalObject {
           });
 
           this.bulkInsertVectors({
-            sql: this.sql,
             vectors: await Promise.all(blob_chunks),
           });
 
@@ -1074,21 +1086,20 @@ export class HyphalObject {
     return next.score - prev.score;
   }
 
-  private bulkInsertVectors(args: { sql: SqlStorage; vectors: VectorType }) {
-    const { sql, vectors } = args;
+  private bulkInsertVectors(args: { vectors: VectorsType }) {
+    const { vectors } = args;
 
     // Insert each vector individually
     // Durable Objects automatically coalesce writes into atomic transactions
     for (const vector of vectors) {
       // Use insertVector function which handles both legacy and new schema
-      insertVector({
+      this.insertVector({
         id: vector.id,
         namespace: vector.namespace,
         blob: vector.blob,
         content: vector.content,
         parent_id: vector.parent_id,
         is_chunk: vector.is_chunk,
-        sql: sql,
       });
     }
   }
@@ -1166,7 +1177,7 @@ export class HyphalObject {
   }
 }
 
-export type VectorType = Array<{
+export type VectorsType = Array<{
   id: string;
   namespace: string;
   blob: Buffer;

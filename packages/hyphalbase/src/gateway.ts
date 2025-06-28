@@ -56,11 +56,22 @@ type UserKey = {
 // The response type for the get_all_user_keys operation
 type GetAllUserKeysResponse = UserKey[];
 
+interface GetUserFromKeyPayload {
+  apiKey: string;
+}
+
+interface GetUserFromKeyResponse {
+  username?: string;
+  user_data?: { [key: string]: unknown };
+  error?: string;
+}
+
 interface OperationMap {
   create_user: { payload: CreateUserPayload; response: CreateUserResponse };
   create_api_key_for_user: { payload: CreateUserApiKeyPayload; response: CreateUserApiKeyResponse };
   validate_api_key: { payload: ValidateUserApiKeyPayload; response: ValidateUserApiKeyResponse };
   get_all_user_keys: { payload: Record<string, never>; response: GetAllUserKeysResponse };
+  get_user_from_key: { payload: GetUserFromKeyPayload; response: GetUserFromKeyResponse };
 }
 
 function createUsersTable(sql: SqlStorage) {
@@ -273,11 +284,16 @@ async function createApiKeyForUser(id: any, sql: SqlStorage): Promise<string> {
 }
 
 export class Gateway {
+  private user?: { username: string; id: string; user_data: any };
   constructor(private sql: SqlStorage) {
     if (sql) {
       createUsersTable(sql);
       createUsersKeysTable(sql);
     }
+  }
+
+  getUser() {
+    return this.user;
   }
 
   private async query<Op extends keyof OperationMap>(
@@ -342,11 +358,68 @@ export class Gateway {
         const isValid = await validateApiKey(apiKey, this.sql);
         return { isValid };
       }
+
       case 'get_all_user_keys': {
         return await getAllUserKeys(this.sql);
       }
+      case 'get_user_from_key':
+        return await this.getUserFromApiKey(payload);
       default:
         return { message: 'Invalid operation' };
+    }
+  }
+
+  private async getUserFromApiKey(
+    payload:
+      | CreateUserPayload
+      | CreateUserApiKeyPayload
+      | ValidateUserApiKeyPayload
+      | Record<string, never>
+      | GetUserFromKeyPayload,
+  ) {
+    {
+      const { apiKey } = payload as GetUserFromKeyPayload;
+      const allKeys = this.sql.exec<Record<string, SqlStorageValue>>(
+        `SELECT uk.*, u.username, u.user_data
+           FROM user_keys uk
+           JOIN users u ON uk.user_id = u.id
+           WHERE uk.revoked = 0`,
+      );
+      const keys = allKeys.toArray();
+
+      for (const key of keys) {
+        try {
+          const keyId = key.id as string;
+          const ciphertext = key.key_ciphertext as Buffer;
+          const iv = key.key_iv as Buffer;
+
+          // @ts-expect-error - global.__encryptionKeys is not defined in the type system
+          const encryptionKeyBytes = global.__encryptionKeys?.[keyId];
+          if (!encryptionKeyBytes) {
+            continue;
+          }
+
+          const encryptionKey = await importKey(encryptionKeyBytes);
+          const decryptedApiKey = await decryptApiKey(
+            new Uint8Array(ciphertext),
+            new Uint8Array(iv),
+            encryptionKey,
+          );
+
+          if (decryptedApiKey === apiKey) {
+            const user = {
+              username: key.username as string,
+              id: key.user_id as string,
+              user_data: JSON.parse(key.user_data as string),
+            };
+            this.user = user;
+            return user;
+          }
+        } catch (error) {
+          continue;
+        }
+      }
+      return { error: 'Invalid API key' };
     }
   }
 }
